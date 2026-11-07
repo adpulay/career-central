@@ -1,6 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
+import {assertStorage} from "./core/operational-storage-contract.mjs";
+import {readOwnedJson,atomicWriteOwnedJson,checkPath} from "./core/operational-files.mjs";
 import {
   acquireDirLock,
   lockRecoveryVerdict,
@@ -26,7 +25,8 @@ export function emptyScheduledStore() {
 
 export function readScheduledStore(storePath) {
   try {
-    const parsed = JSON.parse(fs.readFileSync(storePath, "utf8"));
+    const parsed = readOwnedJson(storePath);
+    if (parsed === undefined) return emptyScheduledStore();
     if (!parsed || typeof parsed !== "object") throw new Error("store root must be an object");
     for (const key of ["jobs", "runs", "queue"]) {
       if (parsed[key] !== undefined && !Array.isArray(parsed[key])) {
@@ -38,6 +38,7 @@ export function readScheduledStore(storePath) {
       runs: Array.isArray(parsed.runs) ? parsed.runs : [],
       queue: Array.isArray(parsed.queue) ? parsed.queue : [],
     };
+    if(Object.hasOwn(parsed,"workerHealth"))store.workerHealth=parsed.workerHealth;
     validateScheduledStore(store);
     return store;
   } catch (error) {
@@ -56,7 +57,8 @@ function assertIso(value, label) {
   }
 }
 
-export function validateScheduledStore(store) {
+export function validateScheduledStore(store, {extensions = true} = {}) {
+  if(extensions && Object.hasOwn(store,"workerHealth"))assertStorage("workers",store.workerHealth);
   for (const job of store.jobs) {
     if (!isObject(job) || !isSafeScheduledId(job.id)) throw new Error("Invalid scheduled job identifier");
     if (!["active", "paused", "deleted"].includes(job.status)) throw new Error(`Invalid status for scheduled job ${job.id}`);
@@ -79,19 +81,11 @@ export function validateScheduledStore(store) {
   }
 }
 
-export function writeScheduledStoreAtomic(storePath, store) {
-  fs.mkdirSync(path.dirname(storePath), { recursive: true });
-  const tempPath = `${storePath}.tmp-${process.pid}-${randomUUID()}`;
-  try {
-    fs.writeFileSync(tempPath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
-    fs.renameSync(tempPath, storePath);
-  } finally {
-    try {
-      fs.rmSync(tempPath, { force: true });
-    } catch {
-      // The atomic rename already succeeded, or best-effort cleanup failed.
-    }
-  }
+export function writeScheduledStoreAtomic(storePath, store, options = {}) {
+  validateScheduledStore(store);
+  const supported={jobs:store.jobs,runs:store.runs,queue:store.queue};
+  if(Object.hasOwn(store,"workerHealth"))supported.workerHealth=store.workerHealth;
+  return atomicWriteOwnedJson(storePath,supported,options);
 }
 
 export function readLockStatus(resourcePath, options = {}) {
@@ -112,6 +106,7 @@ export function readLockStatus(resourcePath, options = {}) {
 // lock on a token match alone, with no check that the directory was still the
 // one it had stamped (#5358).
 function acquireResourceLock(resourcePath, options = {}) {
+  checkPath(resourcePath);checkPath(`${resourcePath}.lock`);checkPath(`${resourcePath}.lock.recover`);
   return acquireDirLock(`${resourcePath}.lock`, {
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     retryMs: options.retryMs ?? DEFAULT_RETRY_MS,

@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'career-central-web-'));
+const put=(name,value)=>{const f=path.join(root,name);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,typeof value==='string'?value:JSON.stringify(value));};
+put('.career-central-fixture','fictional-only');put('cv.md','# Fictional candidate\n');
+put('data/discovery/latest.json',{schemaVersion:1,generatedAt:'2026-01-01T00:00:00Z',jobs:[{company:'Fixture Cloud',title:'Software Engineer I',url:'https://example.invalid/jobs/101'}]});
+put('data/application-automation/ledger.json',{schemaVersion:1,jobs:{a:{company:'Fixture Cloud',title:'Software Engineer I',url:'https://example.invalid/jobs/101',status:'Needs Information',lastSubmission:{id:'attempt',attempted:true,dispatchedAt:'2026-11-01T00:00:00Z',verificationRequired:true,nativeResponse:{status:428,body:'SECRET-CODE'}}}},events:[]});
+put('data/application-automation/outlook.json','SECRET-MAILBOX-CONFIG');
+put('data/scheduled-jobs.json',{jobs:[],queue:[],runs:[]});
+console.log(root);

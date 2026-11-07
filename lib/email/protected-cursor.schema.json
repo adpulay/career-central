@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:career-central:protected-graph-cursor:v1",
+  "title": "Protected Microsoft Graph cursor record",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "accountId": {"type": "string", "pattern": "^acct_[A-Za-z0-9_-]{16,96}$"},
+    "scopeFingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "checkpointId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{8,128}$"},
+    "revision": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "revoked": {"type": "boolean"},
+    "cursor": {"type": ["string", "null"], "minLength": 1, "maxLength": 32768},
+    "cursorDigest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}
+  },
+  "required": ["schemaVersion", "accountId", "scopeFingerprint", "checkpointId", "revision", "revoked", "cursor", "cursorDigest"],
+  "additionalProperties": false,
+  "oneOf": [
+    {"properties": {"revoked": {"const": false}, "cursor": {"type": "string", "minLength": 1}, "cursorDigest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}},
+    {"properties": {"revoked": {"const": true}, "cursor": {"const": null}, "cursorDigest": {"const": null}}}
+  ]
+}

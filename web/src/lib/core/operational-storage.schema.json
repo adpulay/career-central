@@ -1,0 +1,759 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:career-central:operational-storage:v2",
+  "title": "Owned operational metadata persistence v2",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/workers"
+    },
+    {
+      "$ref": "#/$defs/mailbox"
+    }
+  ],
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,3})?(?:Z|[+-]\\d\\d:\\d\\d)$"
+    },
+    "opaqueId": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+    },
+    "digest": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "errorCategory": {
+      "anyOf": [
+        {
+          "enum": [
+            "authentication_required",
+            "permission_denied",
+            "rate_limited",
+            "network",
+            "provider",
+            "invalid_checkpoint",
+            "clock_skew",
+            "unknown"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/instant"
+        },
+        "through": {
+          "$ref": "#/$defs/instant"
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "from",
+        "through",
+        "complete"
+      ],
+      "additionalProperties": false
+    },
+    "connectionInput": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "configured",
+            "disconnected",
+            "connected",
+            "authentication_required",
+            "failed",
+            "unknown"
+          ]
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "errorCategory": {
+          "$ref": "#/$defs/errorCategory"
+        }
+      },
+      "required": [
+        "state",
+        "observedAt",
+        "expiresAt",
+        "errorCategory"
+      ],
+      "additionalProperties": false
+    },
+    "syncInput": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "idle",
+            "syncing",
+            "failed",
+            "unknown"
+          ]
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastSuccessfulSyncAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/coverage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incomplete": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "errorCategory": {
+          "$ref": "#/$defs/errorCategory"
+        }
+      },
+      "required": [
+        "state",
+        "observedAt",
+        "lastSuccessfulSyncAt",
+        "coverage",
+        "incomplete",
+        "errorCategory"
+      ],
+      "additionalProperties": false
+    },
+    "workerInput": {
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "enum": [
+            "local",
+            "remote",
+            "unknown"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "discovery",
+              "application_preparation",
+              "document_generation",
+              "mailbox_read"
+            ]
+          },
+          "maxItems": 4
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "heartbeatTtlSeconds": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 3600
+        },
+        "availability": {
+          "enum": [
+            "online",
+            "offline",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "workerId",
+        "sessionId",
+        "sequence",
+        "kind",
+        "capabilities",
+        "observedAt",
+        "lastHeartbeatAt",
+        "heartbeatTtlSeconds",
+        "availability"
+      ],
+      "additionalProperties": false
+    },
+    "workersInput": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            1
+          ]
+        },
+        "workers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workerInput"
+          },
+          "maxItems": 1000
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "workers"
+      ],
+      "additionalProperties": false
+    },
+    "operation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "id",
+        "digest",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/operation"
+      },
+      "maxItems": 128
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "writer": {
+          "enum": [
+            "local_metadata",
+            "legacy_import"
+          ]
+        },
+        "operationId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/opaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receivedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      },
+      "required": [
+        "writer",
+        "operationId",
+        "receivedAt"
+      ],
+      "additionalProperties": false
+    },
+    "workerRecord": {
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "enum": [
+            "local",
+            "remote",
+            "unknown"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "discovery",
+              "application_preparation",
+              "document_generation",
+              "mailbox_read"
+            ]
+          },
+          "maxItems": 4
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "heartbeatTtlSeconds": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 3600
+        },
+        "availability": {
+          "enum": [
+            "online",
+            "offline",
+            "unknown"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "heartbeatExpiresAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        }
+      },
+      "required": [
+        "workerId",
+        "sessionId",
+        "sequence",
+        "kind",
+        "capabilities",
+        "observedAt",
+        "lastHeartbeatAt",
+        "heartbeatTtlSeconds",
+        "availability",
+        "revision",
+        "heartbeatExpiresAt",
+        "provenance"
+      ],
+      "additionalProperties": false
+    },
+    "workers": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            2
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "operations": {
+          "$ref": "#/$defs/operations"
+        },
+        "workers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workerRecord"
+          },
+          "maxItems": 1000
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "updatedAt",
+        "operations",
+        "workers"
+      ],
+      "additionalProperties": false
+    },
+    "folderScope": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "inbox",
+          "junkemail",
+          "archive",
+          "sentitems",
+          "deleteditems",
+          "all_messages"
+        ]
+      },
+      "maxItems": 6
+    },
+    "checkpoint": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
+        },
+        "folderScope": {
+          "$ref": "#/$defs/folderScope"
+        }
+      },
+      "required": [
+        "id",
+        "completedAt",
+        "coverage",
+        "folderScope"
+      ],
+      "additionalProperties": false
+    },
+    "retry": {
+      "type": "object",
+      "properties": {
+        "attempt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "delaySeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400
+        },
+        "nextAttemptAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "attempt",
+        "delaySeconds",
+        "nextAttemptAt"
+      ],
+      "additionalProperties": false
+    },
+    "mailboxRequest": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/connectionInput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "synchronization": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/syncInput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderScope": {
+          "$ref": "#/$defs/folderScope"
+        },
+        "checkpoint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/checkpoint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        }
+      },
+      "required": [
+        "accountId",
+        "connection",
+        "synchronization",
+        "folderScope",
+        "checkpoint",
+        "retry"
+      ],
+      "additionalProperties": false
+    },
+    "mailbox": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            2
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "operations": {
+          "$ref": "#/$defs/operations"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "accountId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/connectionInput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "synchronization": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/syncInput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderScope": {
+          "$ref": "#/$defs/folderScope"
+        },
+        "checkpoint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/checkpoint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "updatedAt",
+        "operations",
+        "provenance",
+        "accountId",
+        "connection",
+        "synchronization",
+        "folderScope",
+        "checkpoint",
+        "retry"
+      ],
+      "additionalProperties": false
+    },
+    "workerCommand": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740990
+        },
+        "previousSessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/opaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "worker": {
+          "type": "object",
+          "properties": {
+            "workerId": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "sessionId": {
+              "$ref": "#/$defs/opaqueId"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "kind": {
+              "enum": [
+                "local",
+                "remote",
+                "unknown"
+              ]
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "discovery",
+                  "application_preparation",
+                  "document_generation",
+                  "mailbox_read"
+                ]
+              },
+              "maxItems": 4
+            },
+            "lastHeartbeatAt": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/instant"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "heartbeatTtlSeconds": {
+              "type": "integer",
+              "minimum": 15,
+              "maximum": 3600
+            },
+            "availability": {
+              "enum": [
+                "online",
+                "offline",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "workerId",
+            "sessionId",
+            "sequence",
+            "kind",
+            "capabilities",
+            "lastHeartbeatAt",
+            "heartbeatTtlSeconds",
+            "availability"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "operationId",
+        "expectedRevision",
+        "previousSessionId",
+        "worker"
+      ],
+      "additionalProperties": false
+    },
+    "mailboxCommand": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740990
+        },
+        "health": {
+          "$ref": "#/$defs/mailboxRequest"
+        }
+      },
+      "required": [
+        "operationId",
+        "expectedRevision",
+        "health"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

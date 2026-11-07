@@ -1,0 +1,1149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:career-central:projection:v1",
+  "title": "Career Central private read projection v1",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        1
+      ]
+    },
+    "asOf": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT",
+      "maxLength": 40
+    },
+    "consistency": {
+      "enum": [
+        "stable",
+        "changed"
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      },
+      "maxItems": 100000
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/job"
+      },
+      "maxItems": 100000
+    },
+    "applications": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/application"
+      },
+      "maxItems": 100000
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attempt"
+      },
+      "maxItems": 100000
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      },
+      "maxItems": 100000
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conflict"
+      },
+      "maxItems": 100000
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/warning"
+      },
+      "maxItems": 100000
+    },
+    "pendingReviews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/review"
+      },
+      "maxItems": 100000
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/profileSource"
+          },
+          "maxItems": 100000
+        },
+        "timeBudgetMinutes": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "sources",
+        "timeBudgetMinutes"
+      ],
+      "additionalProperties": false
+    },
+    "mailbox": {
+      "type": "object",
+      "properties": {
+        "configured": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authenticationValidated": {
+          "enum": [
+            false
+          ]
+        },
+        "syncFreshness": {
+          "enum": [
+            "unknown"
+          ]
+        },
+        "codeUseSupported": {
+          "enum": [
+            false
+          ]
+        }
+      },
+      "required": [
+        "configured",
+        "authenticationValidated",
+        "syncFreshness",
+        "codeUseSupported"
+      ],
+      "additionalProperties": false
+    },
+    "automation": {
+      "type": "object",
+      "properties": {
+        "readOnly": {
+          "enum": [
+            true
+          ]
+        },
+        "executionSupported": {
+          "enum": [
+            false
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "approval",
+                "discovery",
+                "autonomous"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "submissionEnabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "killSwitch": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "autonomousAuthorizationRecorded": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "jobs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "queued": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "runs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "activeJobs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "pausedJobs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "runningRuns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "failedRuns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "nextRunAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastRunAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "jobs",
+                "queued",
+                "runs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "readOnly",
+        "executionSupported",
+        "mode",
+        "submissionEnabled",
+        "killSwitch",
+        "autonomousAuthorizationRecorded",
+        "schedule"
+      ],
+      "additionalProperties": false
+    },
+    "counts": {
+      "type": "object",
+      "properties": {
+        "jobs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "applications": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "submittedClaims": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recordedReceipts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncertainSubmissions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmedSubmissions": {
+          "type": "null"
+        },
+        "responseRate": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "jobs",
+        "applications",
+        "submittedClaims",
+        "recordedReceipts",
+        "uncertainSubmissions",
+        "confirmedSubmissions",
+        "responseRate"
+      ],
+      "additionalProperties": false
+    },
+    "deadlines": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/deadline"
+          },
+          "maxItems": 50000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "operationalEvidence": {
+      "$ref": "urn:career-central:operational-evidence:v1"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "asOf",
+    "consistency",
+    "sources",
+    "jobs",
+    "applications",
+    "attempts",
+    "evidence",
+    "conflicts",
+    "warnings",
+    "pendingReviews",
+    "profile",
+    "mailbox",
+    "automation",
+    "counts"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "sourceRef": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "locator": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sourceId",
+        "locator",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "original": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "normalized": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "original",
+        "normalized",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "claim": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "enum": [
+            "company",
+            "title",
+            "location"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "field",
+        "value",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "tracker",
+            "ledger",
+            "discovery"
+          ]
+        },
+        "sourceKey": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "postingUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 5000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requisition": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "kind",
+        "sourceKey",
+        "postingUrl",
+        "requisition",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "score": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "scale": {
+          "enum": [
+            5,
+            100
+          ]
+        },
+        "method": {
+          "enum": [
+            "legacy_report",
+            "review_override",
+            "source_assessment"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "value",
+        "scale",
+        "method",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "eligibility": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "enum": [
+            "excluded",
+            "needs_information",
+            "review_required",
+            "eligible",
+            "unknown"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "availability": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "enum": [
+            "active",
+            "expired",
+            "uncertain",
+            "unknown"
+          ]
+        },
+        "checkedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "verdict",
+        "checkedAt",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "job": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "company": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/claim"
+          },
+          "maxItems": 100000
+        },
+        "identities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identity"
+          },
+          "maxItems": 100000
+        },
+        "scores": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/score"
+          },
+          "maxItems": 100000
+        },
+        "eligibility": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/eligibility"
+          },
+          "maxItems": 100000
+        },
+        "availability": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/availability"
+          },
+          "maxItems": 100000
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          },
+          "maxItems": 100000
+        },
+        "statusClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/status"
+          },
+          "maxItems": 100000
+        }
+      },
+      "required": [
+        "id",
+        "company",
+        "title",
+        "location",
+        "claims",
+        "identities",
+        "scores",
+        "eligibility",
+        "availability",
+        "sources",
+        "statusClaims"
+      ],
+      "additionalProperties": false
+    },
+    "application": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "jobId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "statusClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/status"
+          },
+          "maxItems": 100000
+        },
+        "submissionState": {
+          "enum": [
+            "unknown",
+            "reported_submitted",
+            "uncertain",
+            "verification_required",
+            "dispatched_unconfirmed",
+            "receipt_recorded"
+          ]
+        },
+        "independentlyVerified": {
+          "enum": [
+            false
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          },
+          "maxItems": 100000
+        },
+        "trackerNumber": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "jobId",
+        "status",
+        "statusClaims",
+        "submissionState",
+        "independentlyVerified",
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    "attempt": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "applicationId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "kind": {
+          "enum": [
+            "preparation",
+            "submission"
+          ]
+        },
+        "state": {
+          "enum": [
+            "uncertain",
+            "verification_required",
+            "receipt_recorded",
+            "dispatched_unconfirmed",
+            "prepared",
+            "approved"
+          ]
+        },
+        "dispatchedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finishedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "httpStatus": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "id",
+        "applicationId",
+        "kind",
+        "state",
+        "dispatchedAt",
+        "finishedAt",
+        "httpStatus",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "applicationId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "kind": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "occurredAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reviewRequired": {
+          "type": "boolean"
+        },
+        "independentlyVerified": {
+          "enum": [
+            false
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "id",
+        "applicationId",
+        "kind",
+        "occurredAt",
+        "reviewRequired",
+        "independentlyVerified",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "conflict": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "entityId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          },
+          "maxItems": 100000
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "entityId",
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    "warning": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "sourceId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locator": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "code",
+        "sourceId",
+        "locator"
+      ],
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "applicationId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "id",
+        "applicationId",
+        "reason",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "state": {
+          "enum": [
+            "available",
+            "missing",
+            "invalid",
+            "unreadable",
+            "refused"
+          ]
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ageHours": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "freshness": {
+          "enum": [
+            "unknown",
+            "future",
+            "stale",
+            "current"
+          ]
+        },
+        "ownership": {
+          "enum": [
+            "source",
+            "system",
+            "canonical",
+            "operational",
+            "configuration",
+            "derived"
+          ]
+        },
+        "coverage": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "id",
+        "state",
+        "revision",
+        "observedAt",
+        "ageHours",
+        "freshness",
+        "ownership",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
+    "profileSource": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verifiedFacts": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unverifiedFacts": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sourceId",
+        "revision",
+        "verifiedFacts",
+        "unverifiedFacts"
+      ],
+      "additionalProperties": false
+    },
+    "deadline": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "company": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trackerNumber": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "id",
+        "at",
+        "company",
+        "trackerNumber",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -10,14 +10,18 @@ import { OnboardingProgress } from "@/components/home/onboarding-progress";
 import { FirstRunHome } from "@/components/home/first-run-home";
 import { TodayDashboard } from "@/components/home/today-dashboard";
 
+import { readCareerCentralOverview } from "@/lib/career-central/server";
+import { CareerCentralHomeCard } from "@/components/career-central/overview";
+
 export const dynamic = "force-dynamic"; // always read fresh local files at request time (never at build — CI has no user data)
 
-export default function Home() {
+export default async function Home() {
+  const careerCentral = <CareerCentralHomeCard overview={await readCareerCentralOverview()} />;
   const snapshot = { applications: readApplications(), inbox: readInbox() };
   const { phase, onboardingNeeded } = doctorState(snapshot);
   // First run (truly empty install): the CV-upload takeover IS the home — value
   // before commitment. The full dashboard returns once they have a CV or any data.
-  if (showFirstRunHome(phase, snapshot.inbox.length)) return <FirstRunHome />;
+  if (showFirstRunHome(phase, snapshot.inbox.length)) return <>{careerCentral}<FirstRunHome /></>;
 
   const { inbox, applications } = todaySnapshot(snapshot, scoreNum);
   const reasons: Record<string, CardReason> = {};
@@ -41,6 +45,7 @@ export default function Home() {
   const lead = homeLead(snapshot.applications.length > 0 || snapshot.inbox.length > 0);
   return (
     <>
+      {careerCentral}
       {lead === "queue" && dashboard}
       {onboardingNeeded && <OnboardingBanner />}
       {/* The growing-profile panel stays until every prerequisite AND every

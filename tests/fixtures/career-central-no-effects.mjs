@@ -1,0 +1,20 @@
+// Synthetic projection runs under write/network/process tripwires, before imports.
+import fs from 'node:fs';
+import cp from 'node:child_process';
+import http from 'node:http';
+import https from 'node:https';
+import net from 'node:net';
+import {syncBuiltinESMExports} from 'node:module';
+let forbiddenCalls=0;
+const blocked=()=>{forbiddenCalls++;throw Error('Forbidden side effect');};
+for(const name of ['writeFileSync','appendFileSync','mkdirSync','renameSync','unlinkSync','rmSync','rmdirSync','chmodSync','copyFileSync','symlinkSync','linkSync','truncateSync','writeFile','appendFile','mkdir','rename','unlink','rm','rmdir','chmod','copyFile','symlink','link','truncate'])if(fs[name])fs[name]=blocked;
+for(const name of ['writeFile','appendFile','mkdir','rename','unlink','rm','rmdir','chmod','copyFile','symlink','link','truncate'])if(fs.promises[name])fs.promises[name]=blocked;
+const open=fs.openSync;fs.openSync=(p,flags,...rest)=>{if(typeof flags==='string'&&!/^r[s]?$/.test(flags)||typeof flags==='number'&&(flags&(fs.constants.O_WRONLY|fs.constants.O_RDWR|fs.constants.O_CREAT|fs.constants.O_TRUNC|fs.constants.O_APPEND)))return blocked();return open(p,flags,...rest);};
+const read=fs.readFileSync;fs.readFileSync=(p,...args)=>{if(typeof p==='string'&&/msal|oauth|credential|\.env(?:$|\/)/i.test(p))return blocked();return read(p,...args);};
+for(const name of ['spawn','spawnSync','exec','execSync','execFile','execFileSync','fork'])cp[name]=blocked;
+http.request=blocked;http.get=blocked;https.request=blocked;https.get=blocked;net.connect=blocked;net.createConnection=blocked;net.Socket.prototype.connect=blocked;globalThis.fetch=blocked;
+syncBuiltinESMExports();
+const {readCareerProjection}=await import('../../lib/career-central/sources.mjs');
+const result=readCareerProjection({root:process.argv[2],asOf:'2026-11-06T20:00:00Z'});
+if(forbiddenCalls)throw Error('Projection attempted forbidden effects');
+console.log(JSON.stringify({forbiddenCalls,counts:result.counts}));

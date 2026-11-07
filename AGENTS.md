@@ -1,3 +1,13 @@
+## Career Central development context (additive)
+
+For Career Central development, read `docs/career-central/README.md`, then its
+current state, handoff and active task. Load only relevant contracts/ADRs and
+source files after that. These documents describe project state and scope; they
+do not override any instruction, source-of-truth rule, security control or
+approval requirement below. Keep personal records and credentials out of shared
+project documentation. Preserve the existing instruction hierarchy and scoped
+AGENTS files. The original instructions follow unchanged.
+
 # career-ops: open-source AI job search agent
 
 ## Origin

@@ -292,3 +292,11 @@ data/interview-prep/
 .next/
 web/.next/
 web/out/
+
+# Personal resume PDFs placed in the checkout root
+/*.pdf
+
+# Defensive exclusions; Outlook runtime also refuses OAuth caches inside Git.
+msal-cache*.json
+outlook-token*.json
+.outlook-auth/

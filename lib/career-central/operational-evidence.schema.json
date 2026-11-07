@@ -1,0 +1,1130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:career-central:operational-evidence:v1",
+  "title": "Durable evidence and health contracts v1",
+  "$ref": "#/$defs/operationalEvidence",
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,3})?(?:Z|[+-]\\d\\d:\\d\\d)$"
+    },
+    "opaqueId": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$"
+    },
+    "digest": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "errorCategory": {
+      "anyOf": [
+        {
+          "enum": [
+            "authentication_required",
+            "permission_denied",
+            "rate_limited",
+            "network",
+            "provider",
+            "invalid_checkpoint",
+            "clock_skew",
+            "unknown"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sourceRef": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "locator": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sourceId",
+        "locator",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/instant"
+        },
+        "through": {
+          "$ref": "#/$defs/instant"
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "from",
+        "through",
+        "complete"
+      ],
+      "additionalProperties": false
+    },
+    "connectionInput": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "configured",
+            "disconnected",
+            "connected",
+            "authentication_required",
+            "failed",
+            "unknown"
+          ]
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "errorCategory": {
+          "$ref": "#/$defs/errorCategory"
+        }
+      },
+      "required": [
+        "state",
+        "observedAt",
+        "expiresAt",
+        "errorCategory"
+      ],
+      "additionalProperties": false
+    },
+    "syncInput": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "idle",
+            "syncing",
+            "failed",
+            "unknown"
+          ]
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastSuccessfulSyncAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/coverage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incomplete": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "errorCategory": {
+          "$ref": "#/$defs/errorCategory"
+        }
+      },
+      "required": [
+        "state",
+        "observedAt",
+        "lastSuccessfulSyncAt",
+        "coverage",
+        "incomplete",
+        "errorCategory"
+      ],
+      "additionalProperties": false
+    },
+    "mailboxInput": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            1
+          ]
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/connectionInput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "synchronization": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/syncInput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "connection",
+        "synchronization"
+      ],
+      "additionalProperties": false
+    },
+    "workerInput": {
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "enum": [
+            "local",
+            "remote",
+            "unknown"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "discovery",
+              "application_preparation",
+              "document_generation",
+              "mailbox_read"
+            ]
+          },
+          "maxItems": 4
+        },
+        "observedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "heartbeatTtlSeconds": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 3600
+        },
+        "availability": {
+          "enum": [
+            "online",
+            "offline",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "workerId",
+        "sessionId",
+        "sequence",
+        "kind",
+        "capabilities",
+        "observedAt",
+        "lastHeartbeatAt",
+        "heartbeatTtlSeconds",
+        "availability"
+      ],
+      "additionalProperties": false
+    },
+    "workersInput": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            1
+          ]
+        },
+        "workers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workerInput"
+          },
+          "maxItems": 1000
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "workers"
+      ],
+      "additionalProperties": false
+    },
+    "receiptReviewInput": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "ReceiptReconciled"
+          ]
+        },
+        "schemaVersion": {
+          "enum": [
+            1
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "jobKey": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "submissionAttemptId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "reviewHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "receiptTextHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "receiptObservedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "at": {
+          "$ref": "#/$defs/instant"
+        },
+        "decision": {
+          "enum": [
+            "confirmed",
+            "rejected",
+            "needs_review"
+          ]
+        },
+        "reviewer": {
+          "enum": [
+            "human"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "schemaVersion",
+        "id",
+        "jobKey",
+        "submissionAttemptId",
+        "reviewHash",
+        "receiptTextHash",
+        "receiptObservedAt",
+        "at",
+        "decision",
+        "reviewer"
+      ],
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "sourceEventId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/opaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "prepared",
+            "authorized",
+            "dispatched",
+            "native_response",
+            "verification_required",
+            "acceptance_uncertain",
+            "receipt_observed",
+            "receipt_confirmed",
+            "receipt_rejected",
+            "receipt_review_required"
+          ]
+        },
+        "occurredAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reviewStatus": {
+          "enum": [
+            "unreviewed",
+            "needs_review",
+            "confirmed",
+            "rejected"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        }
+      },
+      "required": [
+        "id",
+        "sourceEventId",
+        "kind",
+        "occurredAt",
+        "reviewStatus",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "attemptLifecycle": {
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "attemptId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "sourceApplicationKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/opaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceAttemptId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/opaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "preparation",
+            "submission"
+          ]
+        },
+        "state": {
+          "enum": [
+            "prepared",
+            "authorized",
+            "dispatched",
+            "verification_required",
+            "acceptance_uncertain",
+            "confirmed_receipt",
+            "unknown"
+          ]
+        },
+        "reviewStatus": {
+          "enum": [
+            "unreviewed",
+            "needs_review",
+            "confirmed",
+            "rejected"
+          ]
+        },
+        "independentlyVerified": {
+          "enum": [
+            false
+          ]
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/observation"
+          },
+          "maxItems": 100000
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "maxItems": 100
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          },
+          "maxItems": 100000
+        }
+      },
+      "required": [
+        "applicationId",
+        "attemptId",
+        "sourceApplicationKey",
+        "sourceAttemptId",
+        "kind",
+        "state",
+        "reviewStatus",
+        "independentlyVerified",
+        "observations",
+        "issues",
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    "connection": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "configured",
+            "disconnected",
+            "connected",
+            "authentication_required",
+            "stale",
+            "failed",
+            "unknown"
+          ]
+        },
+        "observedAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expiresAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "errorCategory": {
+          "$ref": "#/$defs/errorCategory"
+        },
+        "liveValidated": {
+          "enum": [
+            false
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "maxItems": 100
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "observedAt",
+        "expiresAt",
+        "errorCategory",
+        "liveValidated",
+        "issues",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "synchronization": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "idle",
+            "syncing",
+            "stale",
+            "failed",
+            "unknown"
+          ]
+        },
+        "observedAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastSuccessfulSyncAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/coverage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incomplete": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "errorCategory": {
+          "$ref": "#/$defs/errorCategory"
+        },
+        "staleAfterSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "maxItems": 100
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "observedAt",
+        "lastSuccessfulSyncAt",
+        "coverage",
+        "incomplete",
+        "errorCategory",
+        "staleAfterSeconds",
+        "issues",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "worker": {
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "sessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/opaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sequence": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "local",
+            "remote",
+            "unknown"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "discovery",
+              "application_preparation",
+              "document_generation",
+              "mailbox_read"
+            ]
+          },
+          "maxItems": 4
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "heartbeatExpiresAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observedAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "availabilityExpiresAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "availability": {
+          "enum": [
+            "online",
+            "offline",
+            "stale",
+            "unknown"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "maxItems": 100
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          },
+          "maxItems": 100000
+        },
+        "stateRevision": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "workerId",
+        "sessionId",
+        "sequence",
+        "kind",
+        "capabilities",
+        "lastHeartbeatAt",
+        "heartbeatExpiresAt",
+        "observedAt",
+        "availabilityExpiresAt",
+        "availability",
+        "issues",
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    "operationalEvidence": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            1
+          ]
+        },
+        "asOf": {
+          "$ref": "#/$defs/instant"
+        },
+        "applicationAttempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attemptLifecycle"
+          },
+          "maxItems": 100000
+        },
+        "mailbox": {
+          "type": "object",
+          "properties": {
+            "connection": {
+              "$ref": "#/$defs/connection"
+            },
+            "synchronization": {
+              "$ref": "#/$defs/synchronization"
+            },
+            "quality": {
+              "enum": [
+                "fresh",
+                "incomplete",
+                "conflicting",
+                "unavailable",
+                "stale",
+                "unknown"
+              ]
+            },
+            "persistence": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/mailboxPersistence"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "connection",
+            "synchronization"
+          ],
+          "additionalProperties": false
+        },
+        "workers": {
+          "type": "object",
+          "properties": {
+            "coverage": {
+              "enum": [
+                "unknown",
+                "reported_only"
+              ]
+            },
+            "records": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/worker"
+              },
+              "maxItems": 1000
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sourceRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "quality": {
+              "enum": [
+                "fresh",
+                "incomplete",
+                "conflicting",
+                "unavailable",
+                "stale",
+                "unknown"
+              ]
+            },
+            "persistence": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/workerPersistence"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "coverage",
+            "records",
+            "source"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "asOf",
+        "applicationAttempts",
+        "mailbox",
+        "workers"
+      ],
+      "additionalProperties": false
+    },
+    "folderScope": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "inbox",
+          "junkemail",
+          "archive",
+          "sentitems",
+          "deleteditems",
+          "all_messages"
+        ]
+      },
+      "maxItems": 6
+    },
+    "retry": {
+      "type": "object",
+      "properties": {
+        "attempt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "delaySeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400
+        },
+        "nextAttemptAt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/instant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "attempt",
+        "delaySeconds",
+        "nextAttemptAt"
+      ],
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "writer": {
+          "enum": [
+            "local_metadata",
+            "legacy_import"
+          ]
+        },
+        "operationId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/opaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receivedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      },
+      "required": [
+        "writer",
+        "operationId",
+        "receivedAt"
+      ],
+      "additionalProperties": false
+    },
+    "checkpoint": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
+        },
+        "folderScope": {
+          "$ref": "#/$defs/folderScope"
+        }
+      },
+      "required": [
+        "id",
+        "completedAt",
+        "coverage",
+        "folderScope"
+      ],
+      "additionalProperties": false
+    },
+    "workerPersistence": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            2
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/instant"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "mailboxPersistence": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            2
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "accountId": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "folderScope": {
+          "$ref": "#/$defs/folderScope"
+        },
+        "checkpoint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/checkpoint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "accountId",
+        "updatedAt",
+        "folderScope",
+        "checkpoint",
+        "retry",
+        "provenance"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
