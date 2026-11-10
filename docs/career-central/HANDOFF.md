@@ -1,5 +1,44 @@
 # Latest handoff
 
+## Dedicated Gmail receiver — 2026-11-10
+
+See [CC-009](tasks/CC-009.md) and [Gmail setup/runbook](../GMAIL.md).
+User authorized a dedicated Gmail receiver/original MSN mapping and code work,
+but explicitly withheld connection access. Actual addresses belong only in
+private local config, not shared project docs. No actual OAuth client config,
+account, token cache or mailbox was opened or changed. Initial HEAD `92b7e0d9`
+was clean. Google registration and connection acceptance remain pending.
+
+Implemented a Google SDK desktop OAuth/PKCE session-only flow with strict
+`gmail.readonly`, audience and receiving-profile checks. CLI `init` is offline;
+`first-sync` and `preview` require explicit `--authorize-connection` plus normal
+browser consent. No refresh-token persistence, app password or billing service.
+Use Outlook Redirect to for original headers; ordinary inline/attached forwards
+are deliberately skipped. Original application recipient and original Date are
+validated independently from receiving account/internalDate. All observations
+remain review-only, with security-mail exclusions and no usable code output.
+
+Gmail reuses the coordinator, analyzer, ledger writer and recovery. Provider-safe
+health is `gmailMailboxHealth`, independent of Outlook's unchanged `mailboxHealth`
+under the same lock. Setup nonce/receiving/original-address binding protects
+checkpoints and dedup namespaces. No second tracker or application status writer.
+The initial read defaults to one hour, one page/10 IDs, up to 10 envelopes and
+10 matched bodies; no continuation/retry. Current UI mailbox cards remain Outlook.
+
+Validation: 249 offline tests pass, 0 fail/skip (three browser cases excluded),
+including 26 Gmail cases and existing Outlook/application safety/projection/
+persistence tests. Added exact Google SDK 11.3.4 and email-addresses 5.0.0 with
+install scripts disabled. npm audit's two moderate existing MSAL/uuid findings
+were recorded without a forced major upgrade. No private data/deployment/push.
+
+Next requires the user: create a no-billing Google project, enable Gmail API,
+External/Testing audience with dedicated test user, Desktop client, exact read-only
+scope, download JSON to a private Linux path outside Git, then offline init with
+the user-provided addresses. Do not initiate any sign-in/profile/mailbox request
+until explicit connection permission arrives. No Microsoft password/tenant is
+needed for this Gmail path. Keep all submission/code-use/status gates disabled.
+Earlier entries below describe historical scopes and checkpoints.
+
 ## Controlled personal Outlook first-sync — 2026-11-10
 
 See [CC-008](tasks/CC-008.md) and the rewritten [Outlook runbook](../OUTLOOK.md).

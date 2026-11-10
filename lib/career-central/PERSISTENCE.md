@@ -114,3 +114,15 @@ No backend is implemented and no raw cursor belongs in the ledger, scheduler, da
 See [CC-004](../../docs/career-central/tasks/CC-004.md) and [STATUS](../../docs/career-central/STATUS.md) for exact commands/results. Fixtures exercise real process contention/crashes and ordinary owner writes, not live services. HTTP-only production rendering bypasses `server.mjs` (and its PDF worker), uses disposable data and executes no browser/client JavaScript. It verifies HTML/API health, redaction, cache/origin/method controls and unchanged source bytes.
 
 Remaining limits: Linux validation only; no native Windows/WSL/network-disk certification, authenticated remote producer or cursor backend; no live OAuth/Graph/mailbox/application validation, automatic producer, receipt-artifact verifier or cloud transport. The existing CV Studio build tracing warning remains. Do not publish local build artifacts or treat health metadata as execution authorization.
+
+## Gmail provider extension (CC-009)
+
+`recordMailboxHealth(root, command, {provider: 'gmail'})` uses the same validated
+v2 health contract, owner ledger lock, CAS/replay and recovery semantics in the
+separate `gmailMailboxHealth` field. The default remains Outlook's
+`mailboxHealth`, unchanged. Only `outlook` and `gmail` provider selectors are
+accepted. Account/scope bindings and revision history never cross provider slots.
+No second application tracker or credential store is introduced. Gmail mailbox
+status is not yet added to the canonical dashboard's Outlook mailbox card.
+The Gmail CLI's read-only recovery path selects its provider explicitly. See
+[the Gmail runbook](../../docs/GMAIL.md) for authorization and bounded-read limits.

@@ -8,3 +8,7 @@ Local readiness and bounded sync preparation were added on 2026-11-10; see
 [CC-008](tasks/CC-008.md) adds a controlled same-process session-only first-sync
 command and native storage fixes. 223 offline checks pass; live/native acceptance
 still requires user participation described in [OUTLOOK](../OUTLOOK.md).
+
+[CC-009](tasks/CC-009.md) adds a dedicated Gmail readonly receiver with shared
+bounded synchronization and isolated provider health. 249 offline checks pass.
+Connection is explicitly unauthorized pending user consent and OAuth setup.

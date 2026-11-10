@@ -2,6 +2,8 @@
 
 Career Central extends Career Ops into a personal career workspace. Develop locally; target a hybrid AWS dashboard/data plane with outbound-only Windows/WSL automation workers. No deployment or new external application actions are authorized by the current milestone.
 
+Current email continuation: [CC-009](tasks/CC-009.md) and the [Gmail runbook](../GMAIL.md) implement the dedicated receiver; connection remains explicitly unauthorized. Outlook stays available.
+
 Read in this order:
 
 1. Repository [AGENTS.md](../../AGENTS.md) and applicable scoped instructions remain authoritative; this entry point does not replace them.

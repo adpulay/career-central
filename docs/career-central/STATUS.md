@@ -1,5 +1,11 @@
 # Verified project state
 
+Latest dedicated Gmail slice (2026-11-10): [CC-009](tasks/CC-009.md) adds a
+consent-gated, session-only Gmail readonly adapter alongside Outlook. 249 offline
+checks pass; no actual account/config/credential/mailbox was accessed. User
+explicitly withheld connection authorization. [Gmail runbook](../GMAIL.md) covers
+no-billing OAuth configuration and the pending controlled first read.
+
 Latest Outlook readiness slice (2026-11-10): [CC-008](tasks/CC-008.md) wires an
 explicit same-process first sign-in/sync with a one-page/10-message/24-hour cap,
 strict delegated read scopes and review-only observations. 223 offline checks
