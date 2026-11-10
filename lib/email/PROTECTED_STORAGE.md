@@ -27,3 +27,13 @@ Current execution environment: Node 24.20.0 in WSL2/Linux (`Ubuntu`), with `wsl.
 Native Windows validation remains required on the intended Windows account: run a clean Node session with the persistence mode selected, validate a save/load/delete round trip through the current-user DPAPI-backed extension, restart Node and verify same-user recovery, verify a different Windows user cannot decrypt, interrupt a write, and confirm no plaintext token/cursor file appears. On WSL/Linux, configure a real Secret Service for the same Linux user, verify service presence and native binding, run the equivalent round-trip/restart/interruption tests, then repeat with the service stopped to prove fail-closed behavior. Do not use Windows DPAPI from WSL via PowerShell as a fallback; that would create an unreviewed cross-identity credential boundary.
 
 M3C automated tests use in-memory fictional secret providers and real local M3B operational writers. They establish contracts and redaction, not OS-vault encryption or native filesystem behavior.
+
+## Local readiness diagnostic
+
+Run `node scripts/outlook-readiness.mjs` from the repository. It emits bounded,
+redacted JSON and exits 2 while prerequisites or real vault validation remain
+incomplete. It loads the native extension and lists acquired Linux user bus names
+with a three-second subprocess timeout; it does not construct persistence or open
+configuration/cache files. A present service and loadable extension are only
+prerequisites. The command deliberately cannot certify a save/restart/load,
+interruption or cross-user isolation test, and never authorizes live sign-in.

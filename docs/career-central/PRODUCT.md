@@ -13,4 +13,10 @@ Purpose: improve job-search effectiveness while reducing repetitive work and pro
 | CC-R07 | Preserve time budgets/quiet periods; unset constraints remain unknown, never assumed available time. |
 | CC-R08 | Maintain compact version-controlled context, evidence-based feature state, ADRs, task acceptance criteria and session handoffs. |
 
-Current authorization: M0.5 context bootstrap, then M1 read-only projection with fictional tests. No new dashboard, cloud provisioning, dependency, live network/browser/mail/authentication, document rewriting or submission work. See [CC-001](tasks/CC-001.md). The [audit](../architecture/career-central-audit.md) contains detailed proposed scope; proposals are not completed features or new authorization.
+Current development scope: M0.5 through M3C foundation is implemented and checkpointed;
+continued local project development is authorized. See [HANDOFF](HANDOFF.md) for
+current work and [STATUS](STATUS.md) for milestone validation. Live Microsoft
+sign-in/sync, credential removal, application actions, new dependencies and cloud
+provisioning require their applicable separate approval. The
+[audit](../architecture/career-central-audit.md) contains proposed scope; proposals
+are not completed features or external-action authorization.

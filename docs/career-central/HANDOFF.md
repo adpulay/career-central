@@ -1,5 +1,56 @@
 # Latest handoff
 
+## Bounded sync continuation — 2026-11-10
+
+Implemented the local bounded sync coordinator; see [CC-006](tasks/CC-006.md).
+It uses the existing mailbox health owner writer and injected inspection and
+observation-persistence capabilities. Tests connect the real analyzer and
+observation writer using fictional messages. No live entry point/polling loop is
+wired. Successful complete windows publish a checkpoint only after observation
+persistence; partial/failing/uncertain runs retain the previous checkpoint.
+Replays require reconciliation without repeating inspection, and active backoff
+blocks inspection. Scope is explicitly `all_messages`, matching the existing
+Graph endpoint. Authentication/identity validation remains the future caller's
+responsibility; the coordinator never declares a connection authenticated.
+
+Final focused regression: 90 passed, 0 failed (sync/readiness/platform/persistence/
+Outlook suites). No dependency installation, live authentication, Graph read,
+private record write, submission, staging, commit or push occurred. Changes from
+both local continuations remain uncommitted. Next: review the coordinator's local
+contract and design explicit interrupted-run reconciliation before wiring any
+live command. Vault validation and bounded live sync acceptance remain unrun.
+
+## Local continuation — 2026-11-10
+
+The cumulative foundation checkpoint is committed as `e7ce36f9` on
+`career-central/pre-m3d-stabilization`, and the private `personal` remote branch
+was verified at the same commit. The working tree was clean before this session.
+The older staging, missing-author and missing-GitHub-CLI notes below are historical,
+not current blockers. This session has not staged, committed or pushed changes.
+
+Added `node scripts/outlook-readiness.mjs`: a bounded local capability diagnostic,
+with redacted JSON and exit 2 when readiness is incomplete. It imports the native
+extension and, on Linux, lists acquired user bus names with a three-second timeout.
+It never constructs persistence, opens configuration/token/cursor files, activates
+a vault, signs in or contacts Graph. Installation/service presence never proves
+vault validation or grants permission. No dependency or credential changes.
+
+Current preflight: WSL/Linux Node 24.20.0; Microsoft extension 1.5.27 cannot load its
+native backend; the user Secret Service could not be confirmed; LibSecret build
+metadata is absent. Native Windows Node 22.21.0 is available, but DPAPI remains
+unvalidated. No Windows dependency installation or vault round trip was performed.
+
+Validation: `node --test tests/outlook-readiness.test.mjs
+ tests/career-central-platform-recovery.test.mjs tests/outlook-email.test.mjs`
+passed 36/36. The live diagnostic is expected to exit 2 in this environment.
+
+Next local work: use the diagnostic alongside the platform-validation procedure
+in PROTECTED_STORAGE.md; mocked contract tests remain distinct from real vault
+acceptance. Live sign-in/sync, legacy-cache removal, submissions and deployment
+remain separately gated. User authorized continued local project development.
+
+## Historical M3C and stabilization handoff
+
 2026-11-06 — M3C complete locally; pre-M3D stabilization complete. Named branch `career-central/pre-m3d-stabilization` is based on `d3fc7d1`. M3D live OAuth/Graph connection, browser automation, submissions and AWS remain unauthorized.
 
 Start with [CURRENT_STATE](CURRENT_STATE.md), authoritative [STATUS](STATUS.md), [CC-005](tasks/CC-005.md), [CC-004](tasks/CC-004.md), [PERSISTENCE](../../lib/career-central/PERSISTENCE.md), and [protected Microsoft storage](../../lib/email/PROTECTED_STORAGE.md). Read applicable original/scoped AGENTS instructions; none were changed. Preserve all prior uncommitted M0.5/M1/M2/M3A/M3B/application/email work.

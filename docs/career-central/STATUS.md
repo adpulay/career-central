@@ -1,5 +1,11 @@
 # Verified project state
 
+Latest local continuation (2026-11-10): foundation checkpoint `e7ce36f9` is committed
+and verified on the private remote. New uncommitted readiness and bounded sync
+work is documented in [CC-006](tasks/CC-006.md) and [HANDOFF](HANDOFF.md): 90
+focused tests passed, 0 failed. No live Microsoft integration is enabled. Earlier
+base/dirty-tree statements below describe their original milestone runs.
+
 Updated 2026-11-06. Local detached HEAD base `d3fc7d1`, uncommitted working tree; no milestone commit/release. Runtime tested: Node v24.20.0. Source/tests outrank summaries.
 
 | Area | Implementation | Validation/deployment | Limits |
