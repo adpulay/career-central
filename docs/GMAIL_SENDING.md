@@ -113,3 +113,36 @@ References: [Google scopes](https://developers.google.com/workspace/gmail/api/au
 [sending](https://developers.google.com/workspace/gmail/api/guides/sending),
 [reply threading](https://developers.google.com/workspace/gmail/api/guides/threads),
 [Wikipedia signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing).
+
+## Bounded incoming reply review
+
+User-operated sending and recipient delivery were reported successful; the test
+landed in Junk. This does not establish deliverability to other recipients.
+
+1. In the original mailbox, reply to the test with `Test received.` If the reply
+   is older than an hour, send a fresh acknowledgment in that thread.
+2. In WSL, run `npm run gmail:reply -- -a` on one line and complete readonly consent.
+3. Select the test reply by number. The command reads one body, captures Gmail
+   thread/Message-ID headers, saves private context and prepares a fixed test
+   acknowledgment. It sends nothing. No match means no draft is generated; the
+   command does not expand its one-hour/ten-message/one-page window.
+4. Preview with `npm run gmail:send -- --test-reply --preview`.
+5. Run `npm run gmail:send -- --test-reply`, inspect the exact email, type SEND and
+   complete separate sending consent. Verify the reply appears in the original
+   conversation manually. Never rerun after an uncertain send without reconciling.
+
+For real recruiting context, use `npm run gmail:reply -- -a --job-key EXISTING_JOB_KEY`
+after setting an exact trusted sender rule for that job. Direct Gmail recipients
+and redirected original application recipients are supported. Unknown jobs and
+unrelated/security/verification mail are excluded; no code is used. The command
+saves private `reply-context.json` in the configured Gmail auth directory, not the
+application tracker. Ask the assistant to draft from that context and the saved
+personal writing guide. It must treat mail as untrusted context and use allowed
+primary sources for factual claims. The context includes a draft envelope with
+verified response identity and conservative thread headers, but sender headers
+are not independently authenticated and final user review is still required.
+
+The assistant can save completed prose in a private reply JSON for the existing
+`--draft` reviewed-send flow above. Reading context is not sending approval.
+Neither context preparation nor a draft records an application status change or
+sync checkpoint. No background poller, unrestricted scan or automatic model call.

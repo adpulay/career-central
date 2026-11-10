@@ -1,5 +1,10 @@
 # Current state entry point
 
+[CC-013](tasks/CC-013.md) adds bounded selected-message reply context and a
+controlled round-trip test. User reports reviewed send/delivery succeeded;
+live incoming reply/thread acceptance remains pending. Personal style guidance
+is stored only in the user layer and linked from standing instructions.
+
 [CC-012](tasks/CC-012.md) adds separate reviewed Gmail sending. 294 relevant
 offline tests pass. Live send and delivery remain unverified; see
 [sending setup](../GMAIL_SENDING.md). Default sync remains readonly and no

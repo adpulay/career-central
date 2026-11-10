@@ -1,5 +1,13 @@
 # Verified project state
 
+## Bounded reply context — 2026-11-10
+
+[CC-013](tasks/CC-013.md): user reports test send/delivery succeeded, initially
+in Junk. Readonly reply review now selects one message from a one-hour/ten-message/
+one-page bound and captures conservative thread headers. Separate send approval
+remains required; live incoming reply/threading acceptance is pending. Personal
+writing samples/guide stay in the user layer. No autonomous replies/submissions.
+
 ## Reviewed Gmail sending — 2026-11-10
 
 [CC-012](tasks/CC-012.md): separate session OAuth with exact readonly + send,

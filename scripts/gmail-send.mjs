@@ -18,12 +18,20 @@ import {sanitizeOAuthDiagnostic} from '../lib/email/oauth-diagnostics.mjs';
 const fail = code => Object.assign(Error(code), {code});
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 async function main() {
-  const {values} = parseArgs({options: {draft: {type: 'string'}, 'job-key': {type: 'string'}, preview: {type: 'boolean', default: false}}});
+  const {values} = parseArgs({options: {draft: {type: 'string'}, 'job-key': {type: 'string'}, 'test-reply': {type: 'boolean', default: false}, preview: {type: 'boolean', default: false}}});
   const root = getCareerOpsRoot();
   const directory = privateDirectory(process.env.CAREER_OPS_GMAIL_AUTH_DIR || path.join(os.homedir(), '.local/state/career-ops/gmail'), repo);
   const config = readGmailConfiguration(path.join(directory, 'config.json'));
   let mail, recipients;
-  if (values.draft) {
+  if (values['test-reply']) {
+    if (values.draft || values['job-key']) throw fail('GMAIL_DRAFT_REJECTED');
+    mail = JSON.parse(readPrivate(path.join(directory, 'test-reply.json')));
+    const context = JSON.parse(readPrivate(path.join(directory, 'test-reply-context.json')));
+    const expected = {...context.draft, body: 'Thanks, I got your reply. The email connection is working.'};
+    if (context.purpose !== 'connection_test' || context.draft?.from !== config.account || context.draft?.to !== config.applicationEmail ||
+        JSON.stringify(mail) !== JSON.stringify(expected)) throw fail('GMAIL_DRAFT_REJECTED');
+    recipients = [config.applicationEmail];
+  } else if (values.draft) {
     // Only private absolute files outside every Git checkout; no mailbox imports.
     if (!path.isAbsolute(values.draft)) throw fail('GMAIL_DRAFT_REJECTED');
     let cursor = values.draft;

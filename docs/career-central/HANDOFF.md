@@ -1,5 +1,30 @@
 # Latest handoff
 
+## Bounded reply context and personal writing guide — 2026-11-10
+
+User reports the first reviewed send reached the original mailbox (in Junk).
+This confirms user-observed delivery, not universal inbox placement. [CC-013](tasks/CC-013.md)
+adds a readonly, interactive latest-hour/ten-metadata/one-page reply-context command
+with one selected detail read. Test mode accepts only the known test acknowledgment;
+job mode reuses exact sender/envelope/application analysis. Thread headers come from
+the selected response, alternate Reply-To is refused, and sensitive code/security
+content cannot become a recruiter draft. No checkpoint/job/observation writes.
+
+Private context/drafts remain outside Git. The new `--test-reply` sending option
+requires the separately prepared matching private test context, preview and SEND.
+Real drafting remains assistant-operated, source-backed and reviewed; no autonomous
+responder or model API is enabled. User-provided samples and the requested personal
+writing guide were saved in the user layer and linked from custom instructions.
+The guide draws carefully from Wikipedia and the supplied fiction research without
+claiming an email detector or copying private writing into shared files.
+
+Next user step: reply to the original test with Test received, then run
+`npm run gmail:reply -- -a`. Live context/thread acceptance is not yet verified.
+Validation: 308 full relevant checks passed, zero failures/skips (three browser
+cases excluded); final focused reply suite passed 15/15 including the subsequently
+added private-preview binding test. Syntax/diff checks pass. No agent mailbox call.
+Earlier entries describe previous acceptance states.
+
 ## Reviewed Gmail sending prepared — 2026-11-10
 
 See [CC-012](tasks/CC-012.md) and [sending setup](../GMAIL_SENDING.md).
