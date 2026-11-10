@@ -1,5 +1,43 @@
 # Latest handoff
 
+## Minimum shortlist-to-alert implementation — 2026-11-10
+
+Implemented [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) local vertical slice;
+[runbook](../JOB_MONITOR.md), [owner extension](../../lib/career-central/JOB_MONITOR.md).
+Reuses existing ATS parsers/HTTP, scanner filters/blacklist and evaluator, saved
+verified application profile/private role emphasis, canonical URL/tracker history
+and application-ledger writer. Derived operational data is `ledger.jobMonitor`,
+not jobs/events or a competing canonical tracker. Existing scheduler is unchanged.
+
+CLI: `npm run monitor -- status`; configure/cache seed/schedule are local; only
+`poll-once --source ID --authorize-live-read` can do a due bounded live cycle.
+No recurring runner is installed/activated. Source claims fence stale workers;
+source snapshot, versioned alerts/proposals and checkpoint publish atomically.
+Baseline/unknown dates/reposts/expiry, conditional unchanged reads, adaptive
+schedules, Retry-After/backoff, pause and bounded stop/restart are covered.
+Application tasks are local proposals with approval/missing-info lists, no browser.
+
+Existing dashboard `/career-central` now displays saved qualified/reviewable jobs,
+source health, alerts and tasks. Interested/dismissed/awaiting-application choices
+and alert dismissal survive reload; POST cannot configure/poll/submit. Cached real
+observations were seeded offline for three proposed sources; no private job lists
+or candidate facts are included here. Canonical application jobs/events and mail
+health/send history were checked unchanged. The cache is labeled, not live evidence.
+
+Proposed employers: Cloudflare, Datadog, MongoDB on existing Greenhouse feeds,
+15-minute desired interval pending user source/budget/activation consent. No live
+feed request was made by the implementation. Obtain approval for one bounded
+cycle per source (at most two allowlisted GETs each), evaluate board completeness/
+policy and sample matches, then separately scope recurring worker installation.
+Do not install cron/Task Scheduler or claim five-minute guarantees from this work.
+
+Validation: 339 relevant synthetic regressions passed, zero failures/skips (three unrelated browser-launching cases excluded by name), including 34 monitor cases. Final focused monitor rerun passed 34/34. The existing Career Central and new monitor production-browser suites each passed on fictional data; typecheck/build and 282 local documentation targets passed. Production browser
+fixture checks saved decisions, alert dismissal, proposals, 375/1440px layouts,
+CSRF/body/command guards and unchanged application state. Typecheck/build passed;
+only the pre-existing CV Studio tracing warning remains. Rich analytics, quiet-hour
+snooze/dispatch, archival, semantic matching and end-to-end applications remain
+partial; live monitoring is not accepted. No emails/applications/cloud/push.
+
 ## Product vision, priorities and core monitoring aligned — 2026-11-10
 
 [CC-014](tasks/CC-014.md) is a documentation-only source audit and planning slice.

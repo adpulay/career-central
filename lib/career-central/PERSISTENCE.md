@@ -1,5 +1,11 @@
 # M3B — Operational persistence and recovery
 
+Later additive owner extension (2026-11-10): [job monitor v1](JOB_MONITOR.md)
+uses the existing application-ledger lock/atomic writer for `jobMonitor` source
+checkpoints, shortlist dispositions, alerts and local preparation proposals.
+It does not change the v2 worker/mailbox health contracts, application records,
+receipt authority or scheduler behavior. Explicit polling is not recurring activation.
+
 Implemented locally: typed worker/mailbox publishers, owned-store metadata preservation, revision/idempotency checks, atomic replacement/recovery, canonical projection and minimal health-card integration. No publisher loop, OAuth, Graph synchronization, cursor backend, browser workflow or task execution is enabled.
 
 ## Storage and authority

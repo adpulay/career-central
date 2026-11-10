@@ -1,0 +1,91 @@
+# Local shortlist and posting monitor
+
+Implemented local/synthetic vertical slice for [CC-015](career-central/tasks/CC-015.md) and [CC-016](career-central/tasks/CC-016.md). No recurring worker, employer application, outgoing message or cloud resource is activated. Open the existing `/career-central` dashboard to see saved monitor results.
+
+## What is operational
+
+Existing ATS provider → bounded source snapshot → shared admission/eligibility and saved-profile ranking → durable shortlist → dashboard alert → local preparation proposal. Baselines are quiet. Synthetic end-to-end and production-browser tests exercise this path; live monitoring acceptance remains separate.
+
+The shortlist reads the existing verified application profile/policy and portals configuration. It reuses shared scanner filters/blacklist, the current ranking evaluator, canonical URL/requisition history, tracker parsing and the application ledger owner lock/atomic writer. Role emphasis is read from private policy. Scores are heuristic, not an AI evaluator or hiring probability. Source excerpts/digests and gaps remain distinct from verified profile facts. Missing graduation/start/geography/authorization/experience/history evidence stays reviewable; it cannot produce an automatically ready application.
+
+Dashboard controls persist Interested, Dismissed and Awaiting application as monitor dispositions, never application status. Alerts can be dismissed, sources paused, and saved results refreshed. Local preparation tasks select an approved resume reference when available, flag missing approval/facts and mark employer questions not yet inspected. No form, upload or resume generation runs from a task. Resume bytes and answers must be revalidated before a separately authorized application workflow.
+
+Existing cached discovery observations can seed a useful offline baseline. Cache provenance is visible as cached_baseline; it is not a successful live poll or a claim of current availability. It generates no new-job alert/task flood. First-seen reflects the retained snapshot time, not a reconstructed earliest historical discovery. Original cache/URLs/content hashes remain source evidence; current private job data does not belong in shared docs.
+
+## Proposed first employers and feeds
+
+These are proposals, not activation or a guarantee of an eligible opening. Existing supported Greenhouse feeds are configured locally at a conservative 15-minute desired interval, with no recurring runner. First verify one bounded cycle, board ownership/completeness and applicable source restrictions; adjust toward five minutes only for an explicitly approved high-priority source and request budget. Actual latency depends on source limits, adaptive cadence and worker availability.
+
+| Employer | Why inspect this source | Proposed official ATS feed |
+|---|---|---|
+| Cloudflare | Infrastructure/network/cloud engineering relevance; individual entry-level/start eligibility still needs evidence | `https://boards-api.greenhouse.io/v1/boards/cloudflare/jobs` |
+| Datadog | Observability/infrastructure/backend relevance and an official early-career program | `https://boards-api.greenhouse.io/v1/boards/datadog/jobs` |
+| MongoDB | Database/backend/platform relevance and official student/graduate programs | `https://boards-api.greenhouse.io/v1/boards/mongodb/jobs` |
+
+Public reference pages inspected: [Cloudflare careers](https://www.cloudflare.com/careers/jobs/), [Datadog early careers](https://careers.datadoghq.com/early-careers/), [MongoDB students/graduates](https://www.mongodb.com/company/careers/students-and-graduates). Public pages/programs and existing cached provider data do not certify current feed reliability, polling policy, graduation compatibility or placement. No monitor live request was executed for implementation. Lever/Ashby adapters are wired; wider sources remain future work.
+
+## Commands and consent
+
+All commands resolve the user data root through `path-resolver.mjs`. Configuration/decisions/cache seeding are local. Status does not initialize absent storage. Use a scratch `CAREER_OPS_ROOT` for fixtures, never put fabricated jobs into actual history.
+
+```sh
+npm run monitor -- status
+npm run monitor -- configure --file /absolute/path/source-proposals.json
+npm run monitor -- seed-cache --source cloudflare
+npm run monitor -- schedule --source cloudflare --minutes 15
+```
+
+Configuration file is an array, at most five sources. Example (not itself authorization):
+
+```json
+[
+  {"id":"cloudflare","company":"Cloudflare","provider":"greenhouse","board":"cloudflare","intervalMinutes":15},
+  {"id":"datadog","company":"Datadog","provider":"greenhouse","board":"datadog","intervalMinutes":15},
+  {"id":"mongodb","company":"MongoDB","provider":"greenhouse","board":"mongodb","intervalMinutes":15}
+]
+```
+
+Existing definitions cannot be silently rebound. Schedule changes preserve checkpoints and do not start a runner. Accepted intervals are 5–1440 minutes. Medium/general desired schedules can be set to 15 or 30–60 minutes. After four quiet cycles the due interval grows adaptively, up to four times the target (24-hour maximum); changes reset it. Jitter and failed-request exponential backoff/Retry-After can further delay polls. Desired cadence is not an SLA.
+
+Only after the user authorizes one specific source/read, the controlled command is:
+
+```sh
+npm run monitor -- poll-once --source cloudflare --authorize-live-read
+```
+
+This performs one due source cycle, at most two allowlisted public GETs, with redirects refused, twenty-second request timeouts and an eight-MiB response cap. No following job URLs, per-job browser, private login or auto-pagination. Due/busy/paused checks can skip a call. Provider retry sleeps are deferred into persisted backoff, including Ashby. Conditional ETag/Last-Modified responses avoid repeated parsing/evaluation. Errors contain sanitized categories, not provider response text.
+
+Before live acceptance obtain the exact employer/feed, two-request maximum, one-cycle scope and saved-alert behavior. Before recurring operation obtain separately the source allowlist, desired intervals, request budget, duration, retention and outage behavior. An ongoing worker/OS-scheduler integration is not installed by this release. Do not put this command into cron/Task Scheduler without that explicit authorization and subsequent worker acceptance. No five-minute blanket polling or guaranteed real-time detection.
+
+## Persistence and recovery contract
+
+`ledger.jobMonitor` schemaVersion 1 is a derived operational namespace inside the existing application ledger, written only by `updateLedger`. Existing jobs/events/receipts/email health/sending reservations are untouched. It is not a second canonical application tracker. See [owner contract](../lib/career-central/JOB_MONITOR.md).
+
+A source lease is durably claimed before fetching. Complete snapshot normalization, evaluation, alerts/proposals and checkpoint advance commit together under the owner lock. Exceptions before publication leave the previous snapshot/checkpoint intact; no partial alerts/tasks survive. Another worker may reclaim an expired 90-second lease; a stale token cannot publish. An uncertain atomic outcome is reported as uncertain, not a proven rollback. Restart never blindly repeats an external application effect because this worker has no such capability.
+
+Stable provider/board/native posting identity retains employer requisition references and canonical-URL aliases. Same-title postings stay separate with a possible-related/repost hint. An absent row requires two complete successful omissions before inferred expiration; failed/partial responses cannot expire it. Returning expired IDs are labeled reappeared with a possible-repost warning, not proven reposts or assigned a fresh application identity. A first snapshot is baseline, not new publication. Provider publication fields are labeled; Lever createdAt is explicitly not verified publication. Unknown/future publication times remain null.
+
+The monitor budget is three MiB of compact JSON within the existing eight-MiB owner ceiling; excluded postings keep minimal evidence, not full bodies. Capacity overflow stops the cycle for manual review rather than evicting history or expanding limits. Cache import is bounded to 128 MiB/30,000 rows and only selected supported boards. General archival/retention and cross-process OS certification remain future work.
+
+## UI, metrics and remaining scope
+
+The local same-origin/no-store API only reads saved state or writes monitor dispositions/pause state. Bounded POST input rejects unknown/action fields, cross-origin requests and attempts to invoke polling/submissions. React displays plain source text, not executable employer HTML. Page refresh never fetches employer feeds.
+
+Basic stored metrics: cycles, failures, unchanged checks, last success/next due and scheduled poll lag; shortlist qualification/review/exclusion/high-priority counts and first-seen/event/task times. Rich daily/cohort dashboards, publication-latency summaries, task completion/confirmed-submission timing, notification snooze/quiet-hour dispatch, archival and a general worker service are not complete in this slice. No publication-to-discovery latency should be inferred from first-seen or Lever creation time.
+
+Next acceptance: user-approved bounded live cycle for the proposed feeds, review representative eligibility/rank results and missing facts, then separately design/approve recurring worker installation. Keep pending applications in reconciliation and preserve all existing approval/kill-switch protections.
+
+## Validation commands
+
+Final relevant offline run: 339 tests passed, zero failures/skips; three unrelated browser-launching cases excluded by explicit name. Includes 34 monitor tests. The two production browser suites are separate fixture runs, not tests against personal records. Typecheck/build passed with the existing CV Studio tracing warning.
+
+```sh
+node --test tests/job-monitor.test.mjs
+npm run typecheck --prefix web
+npm run build --prefix web
+# From web/, using the already-installed Chromium path:
+CAREER_CENTRAL_CHROME_EXECUTABLE=/path/to/chrome node tests/browser-suites.mjs career-central
+CAREER_CENTRAL_CHROME_EXECUTABLE=/path/to/chrome node tests/browser-suites.mjs job-monitor
+```
+
+No live monitor request, recurring installation, application/browser preparation, outgoing email or cloud action was part of acceptance. Public employer career-page research is not monitor execution. Private cached-baseline counts and missing eligibility facts should be reviewed locally, never represented as verified current openings.

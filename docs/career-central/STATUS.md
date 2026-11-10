@@ -1,5 +1,35 @@
 # Verified project state
 
+## Current implementation — shortlist and local monitor, 2026-11-10
+
+[CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) now deliver a minimum local
+source → match → shortlist → dashboard alert → preparation-proposal workflow.
+See [runbook](../JOB_MONITOR.md) and [owner contract](../../lib/career-central/JOB_MONITOR.md).
+The existing `/career-central` UI persists interested/dismissed/awaiting-application
+monitor decisions, alert dismissal and source pause without touching application
+statuses. The CLI supports local configuration/cache seeding/status/schedule and
+one explicitly authorized due live cycle, not an activated recurring worker.
+
+Reuses existing providers/HTTP, admission/ranking, verified private profile/role
+weights, canonical history parsers and ledger lock/atomic writer. Unknown essential
+eligibility/start/history cannot be presented as ready; scores remain heuristic.
+Checkpoints, content versions, first-seen versus publication evidence, deduplicated
+alerts/proposals, conditional reads, adaptive cadence/backoff, leases and crash
+recovery are implemented locally. Cached private discovery data was seeded without
+live feed requests; application jobs/events and email state remained unchanged.
+
+Cloudflare/Datadog/MongoDB feeds are proposed, locally configured at conservative
+15-minute targets but unapproved for recurring use. Live feed reliability, policy,
+current eligibility and latency are not certified. Five-minute targets are possible
+only when separately appropriate/authorized, never a guaranteed detection rate.
+No recurring monitoring, employer form access/upload/submission, external
+notification/email, verification-code entry, paid service or cloud was activated.
+
+Validation: 339 relevant synthetic regressions passed, zero failures/skips (three unrelated browser-launching cases excluded by name), including 34 monitor cases. Final focused monitor rerun passed 34/34. The existing Career Central and new monitor production-browser suites each passed on fictional data; typecheck/build and 282 local documentation targets passed. Earlier evidence below
+is retained as historical state. Remaining product work includes live bounded
+source acceptance, ongoing worker installation, rich monitoring analytics,
+quiet-hour/snooze delivery and full application/document workflows.
+
 ## Current summary — product alignment, 2026-11-10
 
 The [feature inventory](FEATURE_INVENTORY.md) is the detailed capability/status map.

@@ -2,6 +2,15 @@
 
 Source audit: 2026-11-10. This inventory classifies the intended product capability, not merely its helper code. Source and historical tests were inspected; no product tests, live scans, browser applications or mailbox requests were run for this documentation audit. Paths are evidence entry points, not assertions of universal provider compatibility. [Product requirements](PRODUCT.md) · [delivery roadmap](ROADMAP.md).
 
+## Latest local slice — 2026-11-10
+
+[CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) now implement a minimum shared
+shortlist, durable source cycle, dashboard alerts/decisions and local preparation
+proposals using existing components. [Runbook](../JOB_MONITOR.md). Synthetic and
+production-UI acceptance does not certify live feeds or recurring operation.
+Existing private cache seeding is explicitly cached evidence. Earlier broad feature
+rows remain partial where their full lifecycle is not delivered.
+
 ## Status and evidence rules
 
 - **V — Implemented and validated:** bounded behavior demonstrated at the stated level. “Local/fixture” never means production; user-reported live evidence is labeled explicitly.
@@ -104,11 +113,11 @@ Execution authority is independent of maturity. “Approval required” means ex
 
 | ID / capability | State | Evidence | Remaining product acceptance / execution boundary |
 |---|---|---|---|
-| F55 Continuous per-employer monitoring | P | [scan worker](../../web/scripts/scheduled-jobs-runner.mjs), [providers](../../providers/_registry.mjs) | Existing scheduled discovery, not a validated priority/adaptive monitor. Desired 5/15/30–60 minute cadence requires source budgets and worker availability; no recurring activation. |
-| F56 Publication/change lifecycle | P | [scan history](../../scan.mjs), [repost detection](../../detect-reposts.mjs), [listing identity](../../listing-fingerprint.mjs) | Pieces exist; distinct first-seen/published/update/repost/expired/duplicate events and timestamp provenance need a durable integrated contract. |
-| F57 Rapid evaluation/preparation queue | N (monitor workflow) | [ranking](../../lib/applications/discovery.mjs), [application planning](../../lib/applications/greenhouse.mjs) | Reuse existing components; no durable monitor-to-preparation/approval loop. No browser/upload/submit authority from a match. |
-| F58 High-priority alert lifecycle | N (integrated monitor) | [agent inbox](../../agent-inbox.mjs), [overview](../../web/src/app/career-central/page.tsx) | Deduplicated actionable alerts/readiness/quiet-hours/dispositions missing. Desktop/push/email are later gated channels. |
-| F59 Monitoring reliability/latency analytics | N (integrated monitor) | [scan logs](../../scan.mjs), [scheduler store](../../web/src/lib/scheduled-jobs-store.mjs) | Need durable source checkpoints, event/task idempotency, crash/missed-poll recovery, health and timestamp-aware latency/cohort metrics. |
+| F55 Continuous per-employer monitoring | P | [scan worker](../../web/scripts/scheduled-jobs-runner.mjs), [providers](../../providers/_registry.mjs) | Local priority/adaptive source cycle now fixture/UI validated; ongoing scheduler integration and live source acceptance pending. Desired 5/15/30–60 minute cadence requires source budgets and worker availability; no recurring activation. |
+| F56 Publication/change lifecycle | P | [scan history](../../scan.mjs), [repost detection](../../detect-reposts.mjs), [listing identity](../../listing-fingerprint.mjs) | Durable posting versions, separate timestamps/provenance, duplicates, updates, related/reappearance and completeness-based expiry are locally implemented; live semantics remain pending. |
+| F57 Rapid evaluation/preparation queue | P (local proposals validated) | [ranking](../../lib/applications/discovery.mjs), [application planning](../../lib/applications/greenhouse.mjs) | Durable local matching/shortlist/alert/proposal path implemented. Employer form execution and full approval-task lifecycle remain separate. No browser/upload/submit authority from a match. |
+| F58 High-priority alert lifecycle | P (local dashboard validated) | [agent inbox](../../agent-inbox.mjs), [overview](../../web/src/app/career-central/page.tsx) | Deduplicated local alerts, readiness and dismiss/pause dispositions implemented. Quiet hours/snooze and rich delivery lifecycle remain partial. Desktop/push/email are later gated channels. |
+| F59 Monitoring reliability/latency analytics | P (local recovery validated) | [scan logs](../../scan.mjs), [scheduler store](../../web/src/lib/scheduled-jobs-store.mjs) | Local checkpoints, leases/event/task dedup, crash recovery, health/backoff/poll lag implemented. Rich publication latency/cohorts/confirmed-outcome analytics remain pending. |
 
 ## Documentation gaps resolved by this alignment
 

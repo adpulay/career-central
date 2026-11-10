@@ -1,11 +1,11 @@
 # Product backlog and task routing
 
-Updated 2026-11-10. Planning only; no new external execution authority. [Inventory](FEATURE_INVENTORY.md) gives evidence/state; [roadmap](ROADMAP.md) gives dependencies and outcomes. Historical CC-001–CC-013 remain intact. CC-014 is this documentation audit, not a runtime milestone.
+Updated 2026-11-10. Planning index and local implementation status; no new external execution authority. [Inventory](FEATURE_INVENTORY.md) gives evidence/state; [roadmap](ROADMAP.md) gives dependencies and outcomes. Historical CC-001–CC-013 remain intact. CC-014 is this documentation audit, not a runtime milestone.
 
 | Work item | State | Requirement / features | Ready when / next acceptance |
 |---|---|---|---|
-| [CC-015 Reliable shortlist](tasks/CC-015.md) / P1 | Next recommended local implementation | R09; F01–F07 | Existing two discovery paths compared; reviewed fixture corpus/shared policy/identity/explanation contract; bounded ranked result. |
-| [CC-016 Priority monitor](tasks/CC-016.md) / P1b | Planned early core release | R18; F55–F59 | Minimal P1 matching, source-budget/owner contract, crash-safe baseline/change/alert/task fixture acceptance; separately approved source activation. |
+| [CC-015 Reliable shortlist](tasks/CC-015.md) / P1 | Minimum local slice implemented; live quality pending | R09; F01–F07 | Existing two discovery paths compared; reviewed fixture corpus/shared policy/identity/explanation contract; bounded ranked result. |
+| [CC-016 Priority monitor](tasks/CC-016.md) / P1b | Local fixture/UI slice implemented; recurring/live pending | R18; F55–F59 | Minimal P1 matching, source-budget/owner contract, crash-safe baseline/change/alert/task fixture acceptance; separately approved source activation. |
 | Approval-based application / P2 | Planned; reuse partial Greenhouse | R06/R10; F08–F15/F31 | Prepare/approve/dispatch/verify or reconcile one exact application with real receipt acceptance. Never resubmit unresolved prior attempts. |
 | Confirmation bridge / P3 | Planned; collection partial | R05/R12/R13; F14/F25/F26 | One real matched category, exact attempt identity, review disposition and owned-state write/undo contract; no automatic status change by default. |
 | Additional ATS transports / P4 | Planned | R10; F16 | Choose by actual opportunity coverage after baseline conformance; distinguish sourcing from submitting. |

@@ -1,5 +1,12 @@
 # Current state entry point
 
+Current continuation: [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) minimum
+local shortlist/monitor workflow is implemented with synthetic and production-UI
+validation; cached observations seed the dashboard. [STATUS](STATUS.md) and
+[HANDOFF](HANDOFF.md) contain evidence and limits; [runbook](../JOB_MONITOR.md)
+contains commands. Recurring monitoring and live feed acceptance remain pending.
+Older planning snapshots below retain their original states.
+
 ## Current product alignment — 2026-11-10
 
 [STATUS](STATUS.md) is the authoritative implementation/validation summary;

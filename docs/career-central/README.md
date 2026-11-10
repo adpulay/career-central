@@ -2,7 +2,7 @@
 
 Career Central extends Career Ops into a personal career workspace. Develop locally; target a hybrid AWS dashboard/data plane with outbound-only Windows/WSL automation workers. No deployment or new external application actions are authorized by the current milestone.
 
-Current continuation: [CC-014](tasks/CC-014.md) aligns the complete product vision and early core monitoring. Review [PRODUCT](PRODUCT.md), [FEATURE_INVENTORY](FEATURE_INVENTORY.md), [ROADMAP](ROADMAP.md) and [BACKLOG](BACKLOG.md). Recommended next implementation: [CC-015](tasks/CC-015.md) minimum reliable discovery/ranking, followed promptly by [CC-016](tasks/CC-016.md) priority monitoring/rapid preparation. Neither task is started by this planning audit. Gmail's controlled round trip is user-reported successful; broader recruiting/application workflows remain partial.
+Current continuation: [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) have a minimum implemented local shortlist → alert → preparation-proposal slice, existing-dashboard controls and offline cached seeding. See [monitor runbook](../JOB_MONITOR.md), [STATUS](STATUS.md) and [HANDOFF](HANDOFF.md). Live source acceptance/recurring activation remain pending. The broader [PRODUCT](PRODUCT.md), [inventory](FEATURE_INVENTORY.md) and [ROADMAP](ROADMAP.md) preserve incomplete product scope and all safety gates.
 
 Read in this order:
 
