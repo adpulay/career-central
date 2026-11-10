@@ -7,7 +7,7 @@ import {configureSources, pollSource, loadMatchingContext, monitorView, setMonit
 import {createFeedReader} from '../lib/career-central/monitor-feed.mjs';
 const fail = code => Object.assign(Error(code), {code});
 const {values, positionals} = parseArgs({allowPositionals: true, options: {file: {type: 'string'}, source: {type: 'string'},
-  'authorize-live-read': {type: 'boolean', default: false}, posting: {type: 'string'}, decision: {type: 'string'}, minutes: {type: 'string'}}});
+  'authorize-live-read': {type: 'boolean', short: 'a', default: false}, posting: {type: 'string'}, decision: {type: 'string'}, minutes: {type: 'string'}}});
 async function main() {
   const root = getCareerOpsRoot(), command = positionals[0];
   if (positionals.length !== 1) throw fail('MONITOR_COMMAND_INVALID');
@@ -21,12 +21,13 @@ async function main() {
   if (command === 'decide') return setMonitorDecision(root, {postingId: values.posting, decision: values.decision});
   if (command === 'seed-cache') return seedCachedShortlist({root, sourceId: values.source});
   if (command === 'schedule') return setMonitorInterval(root, values.source, Number(values.minutes));
-  if (command === 'poll-once') {
+  if (command === 'pause' || command === 'resume') return setMonitorDecision(root, {pausedSource: values.source, paused: command === 'pause'});
+  if (command === 'poll-once' || command === 'first-poll') {
     if (!values['authorize-live-read']) throw fail('MONITOR_LIVE_NOT_AUTHORIZED');
     const controller = new AbortController();
     const stop = () => controller.abort(); process.once('SIGINT', stop); process.once('SIGTERM', stop);
     try {return await pollSource({root, sourceId: values.source, context: loadMatchingContext(root), fetchSnapshot: createFeedReader(),
-      mode: 'live', authorizeLiveRead: true, signal: controller.signal});}
+      mode: 'live', authorizeLiveRead: true, signal: controller.signal, requireFirstLiveBaseline: command === 'first-poll'});}
     finally {process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);}
   }
   throw fail('MONITOR_COMMAND_INVALID');

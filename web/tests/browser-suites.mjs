@@ -45,6 +45,7 @@ process.env.TMPDIR = fs.realpathSync(os.tmpdir());
 // assistant-focus needs.
 const SUITES = {
   "job-monitor": { url: "JOB_MONITOR_TEST_URL", root: "JOB_MONITOR_TEST_ROOT", fixture: "job-monitor" },
+  "job-monitor-cache": { url: "JOB_MONITOR_CACHE_TEST_URL", root: "JOB_MONITOR_CACHE_TEST_ROOT", fixture: "job-monitor-cache" },
   "career-central": { url: "CAREER_CENTRAL_TEST_URL", root: "CAREER_CENTRAL_TEST_ROOT", fixture: "career-central" },
   "accessible-names": { url: "ACCESSIBLE_NAMES_TEST_URL", fixture: "pipeline-status" },
   "analytics-views": { url: "ANALYTICS_TEST_URL", root: "ANALYTICS_TEST_ROOT", fixture: "pipeline-status" },

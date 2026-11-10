@@ -31,9 +31,10 @@ export function JobMonitor() {
       {error && <p role="alert" className="text-sm">{error}</p>}
       {!view && <p>Loading saved results…</p>}
       {view?.available && <>
+        {view.sources?.some(source => source.status === 'cached_baseline') && <p className="text-sm font-medium" data-testid="monitor-cache-warning">Cached snapshot: live availability and employer eligibility still need verification.</p>}
         {!view.sources?.length && <p>No sources configured. Use the local monitor setup after reviewing the proposed employers.</p>}
         {view.sources?.map(source => <div key={source.id} className="flex flex-wrap items-center gap-3 border-t border-border pt-2 text-sm">
-          <span>{source.company}: {source.status}{source.paused ? ' (paused)' : ''}</span><span>Target: {source.intervalMinutes} min</span><span>Last success: {when(source.lastSuccessAt)}</span><span>Failures: {source.failures}</span>
+          <span>{source.company}: {source.status.replaceAll('_', ' ')}{source.paused ? ' (paused)' : ''}</span><span>Target: {source.intervalMinutes} min</span><span>Last success: {when(source.lastSuccessAt)}</span><span>Failures: {source.failures}</span>
           <button className={button} disabled={busy} onClick={() => void save({pausedSource: source.id, paused: !source.paused})}>{source.paused ? 'Allow future manual polls' : 'Pause source'}</button>
         </div>)}
       </>}
@@ -44,12 +45,12 @@ export function JobMonitor() {
         <button className={button} disabled={busy} onClick={() => void save({alertId: alert.id, alertStatus: 'dismissed'})}>Dismiss alert</button>
       </div>)}</Card>}
     {view?.available && <p className="text-sm text-muted">{view.totalJobs ?? 0} qualified or reviewable opportunities. Showing up to 100; fit scores are heuristic, not hiring probabilities.</p>}
-    {view?.jobs?.map(job => <Card corner="br" key={job.id} className="space-y-3" id={`posting-${job.id}`}>
+    {view?.jobs?.map(job => <Card corner="br" key={job.id} className="space-y-3" id={`posting-${job.id}`} data-testid="monitor-opportunity">
       <h3 className="font-semibold">{job.company} · {job.title}</h3>
       <p className="text-sm">{job.location || 'Location unknown'} · {job.salary || 'Salary unknown'} · {job.match.score}/100 · {job.match.status.replaceAll('_', ' ')}{job.match.highPriority ? ' · High priority' : ''}</p>
       <p className="text-xs text-muted">First seen: {when(job.firstSeenAt)} · Employer date: {when(job.employerPublishedAt)} ({job.publicationProvenance})</p>
       <p className="text-sm">{job.match.reasons.join(' · ')}</p>
-      {!!job.match.unknowns.length && <p className="text-sm">Needs review: {job.match.unknowns.join(' · ')}</p>}
+      {!!job.match.unknowns.length && <p className="text-sm" data-testid="monitor-eligibility-review"><strong>Eligibility evidence incomplete.</strong> Needs review: {job.match.unknowns.join(' · ')}</p>}
       <details className="text-sm"><summary>Match evidence and gaps</summary><p>{job.match.gaps.join(' · ') || 'No additional gaps extracted.'}</p><p className="text-xs">Method: {job.match.method}</p></details>
       <a href={job.url} target="_blank" rel="noopener noreferrer" className="inline-block text-sm underline">View employer posting</a>
       <label className="block text-sm">Your decision <select aria-label={`Decision for ${job.title}`} className="ml-2 rounded border border-border bg-background p-2" disabled={busy} value={job.decision}

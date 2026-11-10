@@ -234,3 +234,54 @@ test('truncated description cannot yield a ready preparation proposal', () => fi
   await poll(root, [job('1', {description: job().description + ' x'.repeat(25000)})], now + step);
   assert.equal(monitorView(root).tasks.length, 0); assert.equal(monitorView(root).jobs[0].match.status, 'needs_review');
 }));
+test('first live response after cached seeding is a fresh quiet baseline, then changes alert exactly once', () => fixture(async root => {
+  await configureSources(root, [source]);
+  await poll(root, [job()], now, {mode: 'cache'});
+  const firstId = monitorView(root).jobs[0].id;
+  await setMonitorDecision(root, {postingId: firstId, decision: 'interested'});
+  const baseline = await poll(root, [], now + step, {mode: 'live', authorizeLiveRead: true, fetchSnapshot: async (_, checkpoint) => {
+    assert.equal(checkpoint, null); return {jobs: [job('101', {description: job().description + ' Changed since cache.'}), job('102')], complete: true};
+  }});
+  assert.equal(baseline.baseline, true); assert.equal(baseline.alerts, 0); assert.equal(baseline.preparationTasks, 0);
+  assert.equal(monitorView(root).jobs.find(row => row.id === firstId).decision, 'interested');
+  assert.equal(readMonitor(root).sources.fictional.checkpoint.provenance, 'live_feed');
+  const next = [job('101', {description: job().description + ' Changed again.'}), job('102'), job('103')];
+  const changed = await poll(root, next, now + step * 2, {mode: 'live', authorizeLiveRead: true});
+  assert.equal(changed.baseline, false); assert.equal(changed.alerts, 2);
+  assert.equal((await poll(root, next, now + step * 3, {mode: 'live', authorizeLiveRead: true})).alerts, 0);
+}));
+test('failed first live request or invalid 304 cannot promote cache to a live baseline', () => fixture(async root => {
+  await configureSources(root, [source]); await poll(root, [job()], now, {mode: 'cache'});
+  const before = readMonitor(root).sources.fictional.checkpoint;
+  assert.equal((await poll(root, [], now + step, {mode: 'live', authorizeLiveRead: true, fetchSnapshot: async () => ({notModified: true})})).state, 'failed');
+  assert.deepEqual(readMonitor(root).sources.fictional.checkpoint, before);
+  const retry = await poll(root, [job(), job('102')], now + step * 10, {mode: 'live', authorizeLiveRead: true});
+  assert.equal(retry.baseline, true); assert.equal(retry.alerts, 0);
+}));
+test('cached postings absent from the first complete live baseline are not shown as currently listed', () => fixture(async root => {
+  await configureSources(root, [source]); await poll(root, [job()], now, {mode: 'cache'});
+  await poll(root, [], now + step, {mode: 'live', authorizeLiveRead: true});
+  assert.equal(monitorView(root).jobs.length, 0); assert.equal(Object.values(readMonitor(root).postings)[0].availability, 'not_seen_in_live_baseline');
+}));
+test('pausing a source during an in-flight read prevents publication and new claims', () => fixture(async root => {
+  await configureSources(root, [source]);
+  await poll(root, [], now, {fetchSnapshot: async () => {await setMonitorDecision(root, {pausedSource: source.id, paused: true}); return {jobs: [job()], complete: true};}});
+  assert.equal(readMonitor(root).sources.fictional.checkpoint, null); assert.equal(monitorView(root).jobs.length, 0);
+  assert.equal((await poll(root, [], now + step)).skipped, 'paused');
+}));
+test('first-poll guard prevents accidental second live requests under the owner lock', () => fixture(async root => {
+  await configureSources(root, [source]);
+  await poll(root, [job()], now, {mode: 'live', authorizeLiveRead: true, requireFirstLiveBaseline: true});
+  const before = readMonitor(root);
+  const again = await poll(root, [], now + step, {mode: 'live', authorizeLiveRead: true, requireFirstLiveBaseline: true, fetchSnapshot: () => assert.fail('must not poll twice')});
+  assert.equal(again.skipped, 'live_baseline_exists'); assert.deepEqual(readMonitor(root), before);
+}));
+test('CLI pause/resume are local controls and first-poll requires explicit consent', () => fixture(async root => {
+  await configureSources(root, [source]); const env = {...process.env, CAREER_OPS_ROOT: root};
+  for (const command of ['pause', 'resume']) {
+    const result = spawnSync(process.execPath, ['scripts/job-monitor.mjs', command, '--source', source.id], {env, encoding: 'utf8'});
+    assert.equal(result.status, 0, result.stderr); assert.equal(readMonitor(root).sources.fictional.paused, command === 'pause');
+  }
+  const denied = spawnSync(process.execPath, ['scripts/job-monitor.mjs', 'first-poll', '--source', source.id], {env, encoding: 'utf8'});
+  assert.equal(denied.status, 1); assert.match(denied.stderr, /MONITOR_LIVE_NOT_AUTHORIZED/);
+}));
