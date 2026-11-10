@@ -1,5 +1,11 @@
 # Dedicated Gmail receiver for forwarded recruiting mail
 
+## Optional reviewed sending
+
+Sending is a separate, explicitly approved flow. Follow [reviewed Gmail sending](GMAIL_SENDING.md)
+for the additional narrow send scope, local preview and first controlled test.
+The receiving/sync instructions below remain read-only.
+
 The Gmail receiver is an opt-in local CLI alongside the preserved Outlook/Graph
 integration. Keep the existing application email as the original recipient;
 configure a separate receiving Gmail account. Personal addresses belong only in

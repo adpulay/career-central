@@ -2,7 +2,7 @@
 
 Career Central extends Career Ops into a personal career workspace. Develop locally; target a hybrid AWS dashboard/data plane with outbound-only Windows/WSL automation workers. No deployment or new external application actions are authorized by the current milestone.
 
-Current email continuation: [CC-011](tasks/CC-011.md) fixes Gmail provider response handling and records actual user-operated bounded list acceptance. See the [Gmail runbook](../GMAIL.md). Outlook remains available; live message classification is separate from list access.
+Current email continuation: [CC-012](tasks/CC-012.md) adds explicitly reviewed Gmail sending and [setup instructions](../GMAIL_SENDING.md). [CC-011](tasks/CC-011.md) records actual user-operated bounded list acceptance. Outlook remains available; live sending and message classification require separate acceptance.
 
 Read in this order:
 

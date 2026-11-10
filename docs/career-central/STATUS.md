@@ -1,5 +1,13 @@
 # Verified project state
 
+## Reviewed Gmail sending — 2026-11-10
+
+[CC-012](tasks/CC-012.md): separate session OAuth with exact readonly + send,
+interactive content approval, durable duplicate/uncertain-outcome protection and
+private reviewed replies. 294 relevant offline checks pass; no live send or
+delivery verification. Default readonly bounded sync and application gates stay
+unchanged. See [setup](../GMAIL_SENDING.md).
+
 Latest Gmail provider slice (2026-11-10): [CC-011](tasks/CC-011.md) fixes JSON
 parsing of HTTP 204 and retains explicit zero-result list metadata. A subsequent
 user-operated actual Gmail message-list GET passed with HTTP 200, validated

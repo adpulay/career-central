@@ -1,5 +1,29 @@
 # Latest handoff
 
+## Reviewed Gmail sending prepared — 2026-11-10
+
+See [CC-012](tasks/CC-012.md) and [sending setup](../GMAIL_SENDING.md).
+User authorized a separate send flow and supplied personal email-style samples;
+personal records remain in the user layer, never shared source or this handoff.
+Default sync remains exact readonly, one hour/10 messages/one page. The separate
+command requests readonly + gmail.send, verifies account/audience/scopes, previews
+one exact plain-text message and requires literal SEND before OAuth and dispatch.
+No background responder, model API, application submission or status change.
+
+Hashed attempts are reserved with the existing ledger owner writer before POST.
+Accepted/uncertain attempts block duplicate dispatch, including after restart.
+No retries or automatic reconciliation. Replies require a private reviewed file,
+existing job/exact sender rule and manually verified thread headers; they do not
+yet have automatic incoming-thread provenance or reply orchestration.
+
+294 relevant offline tests pass, zero failures/skips; three browser-launching
+cases excluded by name. Includes 16 new sending/style/CLI/OAuth regressions.
+No live send or mailbox access during development. User must add only gmail.send
+in the existing Google project, preview with `npm run gmail:send -- --preview`,
+then run `npm run gmail:send`, review, type SEND and complete fresh browser consent.
+First acceptance is a clearly marked test to the configured original address;
+actual Gmail send receipt and recipient delivery remain unverified.
+
 ## Gmail provider failure fixed; controlled live list verified — 2026-11-10
 
 See [CC-011](tasks/CC-011.md). Safe diagnostics identified the actual failure:
