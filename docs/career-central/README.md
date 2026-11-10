@@ -2,7 +2,7 @@
 
 Career Central extends Career Ops into a personal career workspace. Develop locally; target a hybrid AWS dashboard/data plane with outbound-only Windows/WSL automation workers. No deployment or new external application actions are authorized by the current milestone.
 
-Current email continuation: [CC-009](tasks/CC-009.md) and the [Gmail runbook](../GMAIL.md) implement the dedicated receiver; connection remains explicitly unauthorized. Outlook stays available.
+Current email continuation: [CC-009](tasks/CC-009.md) implements the dedicated receiver; [CC-010](tasks/CC-010.md) adds safe diagnostics for a user-reported post-callback failure. See the [Gmail runbook](../GMAIL.md). No agent mailbox access is authorized during diagnosis. Outlook stays available.
 
 Read in this order:
 

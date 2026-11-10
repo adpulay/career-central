@@ -12,3 +12,8 @@ still requires user participation described in [OUTLOOK](../OUTLOOK.md).
 [CC-009](tasks/CC-009.md) adds a dedicated Gmail readonly receiver with shared
 bounded synchronization and isolated provider health. 249 offline checks pass.
 Connection is explicitly unauthorized pending user consent and OAuth setup.
+
+[CC-010](tasks/CC-010.md) diagnoses a reported post-callback Gmail failure and
+adds sanitized OAuth stages plus retry/listener fixes. 261 offline checks pass.
+Windows-to-WSL synthetic forwarding passed; no agent mailbox access occurred.
+The old downstream provider error requires a fresh user-run diagnostic retry.

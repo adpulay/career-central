@@ -181,8 +181,8 @@ test('oversized pages, malformed headers and provider errors fail closed without
   const malformed = raw(); malformed.payload.headers.push({name: 'From', value: 'other@invalid.test'});
   assert.throws(() => normalizeGmailMessage(malformed));
   const denied = new GmailReadClient({getToken: async () => 'fixture', fetchFn: async () => ({ok: false, status: 403,
-    json: () => assert.fail('must not read provider body')})});
-  await assert.rejects(denied.profile(), error => error.status === 403 && error.message === 'GMAIL_READ_FAILED');
+    json: async () => ({error: {message: 'PRIVATE_PROVIDER_BODY', details: [{reason: 'SERVICE_DISABLED'}]}})})});
+  await assert.rejects(denied.profile(), error => error.status === 403 && error.message === 'GMAIL_READ_FAILED' && error.providerReason === 'api_disabled');
 });
 test('plain/HTML multipart bodies are analyzed without attachments or embedded header promotion', () => {
   const message = raw(); message.payload.mimeType = 'multipart/alternative'; delete message.payload.body;

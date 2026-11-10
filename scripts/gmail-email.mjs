@@ -14,6 +14,7 @@ import {writePrivate} from '../lib/email/outlook-auth.mjs';
 import {loadGoogleDesktopClient, createGmailAuth} from '../lib/email/gmail-auth.mjs';
 import {readGmailConfiguration, validateGmailConfiguration} from '../lib/email/gmail-configuration.mjs';
 import {runControlledGmailSync} from '../lib/email/gmail-sync.mjs';
+import {sanitizeOAuthDiagnostic} from '../lib/email/oauth-diagnostics.mjs';
 import {inspectMailboxSyncRecovery, abandonInterruptedMailboxSync} from '../lib/email/sync-recovery.mjs';
 
 const fail = code => Object.assign(Error(code), {code});
@@ -26,7 +27,7 @@ async function locked(file, action) {
 async function main() {
   const {values, positionals} = parseArgs({allowPositionals: true, options: {
     account: {type: 'string'}, 'application-email': {type: 'string'}, 'client-file': {type: 'string'},
-    hours: {type: 'string'}, 'authorize-connection': {type: 'boolean', default: false},
+    diagnostics: {type: 'boolean', default: false}, hours: {type: 'string'}, 'authorize-connection': {type: 'boolean', default: false},
     'job-key': {type: 'string'}, sender: {type: 'string'}, 'run-id': {type: 'string'},
     'expected-revision': {type: 'string'}, 'acknowledge-worker-stopped': {type: 'boolean', default: false},
   }});
@@ -69,7 +70,7 @@ async function main() {
     console.log('Exact sender rule saved for one existing application. No mailbox connection made.'); return;
   }
   const credentials = loadGoogleDesktopClient(config.clientFile, {repo});
-  const auth = createGmailAuth(credentials);
+  const auth = createGmailAuth({...credentials, onDiagnostic: values.diagnostics ? event => console.error(JSON.stringify({oauthDiagnostic: event})) : undefined});
   await locked(path.join(directory, 'session.lock'), async () => {
     try {
       const result = await runControlledGmailSync({root, config, auth, authorizeConnection: true,
@@ -86,6 +87,8 @@ main().catch(error => {
     'GMAIL_ACCOUNT_REJECTED', 'GMAIL_SIGN_IN_FAILED', 'INVALID_CONTROLLED_WINDOW', 'SESSION_SIGN_IN_REQUIRED',
     'SYNC_RECONCILIATION_REQUIRED', 'SYNC_CONTEXT_CONFLICT', 'SYNC_BACKOFF_ACTIVE', 'STALE_STATE_REVISION',
     'WORKER_STOP_ACKNOWLEDGMENT_REQUIRED', 'SYNC_RECOVERY_CONTEXT_CONFLICT', 'INVALID_RECOVERY_REQUEST']);
+  const diagnostic = sanitizeOAuthDiagnostic(error?.oauthDiagnostic);
   console.error(JSON.stringify({error: allowed.has(error?.code) ? error.code : 'GMAIL_OPERATION_FAILED',
+    ...(diagnostic ? {oauthDiagnostic: diagnostic} : {}),
     automaticStatusChanges: false, submittedApplications: 0})); process.exitCode = 1;
 });

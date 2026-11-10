@@ -204,3 +204,71 @@ commit are separate; do not infer rollback or exactly-once processing after an
 uncertain outcome. There is no background loop or persistent authentication.
 Revoke Google-side access in your Google Account's third-party connections if
 needed; process exit alone clears local tokens, not Google's consent record.
+
+## Diagnose a browser-success / CLI-sign-in failure safely
+
+The old callback page said "Sign-in received" immediately after valid state/code
+receipt, before Google's code exchange or account verification. That page proved
+the callback reached WSL, not that authentication completed. The revised page
+explicitly says verification is still in progress. Keep the terminal open.
+The listener binds only 127.0.0.1 and stays active until verification finishes,
+then closes. Never reuse an old callback URL or share its query parameters.
+
+A no-OAuth Windows-to-WSL connectivity probe is available:
+
+```sh
+node scripts/gmail-loopback-check.mjs
+```
+
+It starts a temporary IPv4 loopback-only HTTP listener, verifies it from WSL and
+native Windows PowerShell, and emits only pass/fail plus the nonsecret local port.
+It reads no config/credential/account and changes no WSL or Windows networking.
+It does not authenticate, access a mailbox or relax TLS/forwarding security.
+Native Windows interop is required for its Windows leg. It is separate from the
+OAuth listener, so never use a real callback URL/code for this check.
+
+After explicit authorization, retry the same controlled one-hour read with:
+
+```sh
+node scripts/gmail-email.mjs first-sync --hours 1 --authorize-connection --diagnostics
+```
+
+Use the newly printed Google authorization URL. Existing private setup remains;
+do not rerun init or replace credentials just to retry. Diagnostic output goes
+to stderr and contains only closed-vocabulary events/stages/categories, fixed
+messages, optional HTTP status, allow-listed network codes and the local listener
+port. No logs are saved automatically. Authorization URL display remains only
+for local sign-in; do not share it or a callback URL with diagnostic output.
+
+Relevant events, in order: listener_ready, callback_received,
+code_exchange_started/succeeded, token_info_started/succeeded,
+account_verification_started, account_verified, listener_closed. A rejected
+state/malformed request logs no request data and cannot start code exchange.
+Failure summaries include a sanitized `oauthDiagnostic` even without the flag.
+The flag does not authorize a connection by itself.
+
+| Stage/category | Meaning / safe next action |
+|---|---|
+| callback_wait / callback_timeout | No valid callback arrived in five minutes. Run the synthetic probe; keep the terminal open; use a fresh sign-in. |
+| code_exchange / invalid_client | Google rejected client credentials. Verify your private JSON is the intended Desktop client from the correct project. |
+| code_exchange / invalid_grant | Google rejected the one-time grant. Start fresh; never replay a saved callback URL/code. |
+| code_exchange / redirect_mismatch | Verify Desktop app client type and use the current generated loopback redirect. Do not disable PKCE/state. |
+| token_info / authentication_required | Google rejected the access token during independent token verification. Start a fresh sign-in. |
+| account_verification / api_disabled | Enable Gmail API under APIs & Services in the same project as this Desktop client. No billing is needed. Retry fresh. |
+| account_verification / permission_denied | Check API enablement and readonly consent; add no broader scope. |
+| account_verification / account_mismatch | Choose the configured receiving Gmail account; no address appears in diagnostics. |
+| any / tls_trust | Repair trusted CA/proxy configuration. Never set NODE_TLS_REJECT_UNAUTHORIZED=0 or use insecure TLS flags. |
+| any / network_dns or network_timeout | Repair WSL DNS/connectivity and start a fresh sign-in. |
+
+Only two closed Google API-disabled reason strings are recognized from error
+JSON. Raw provider error messages/descriptions, metadata and request configuration
+are never logged. Unknown errors remain redacted but retain the failed stage.
+Share only the sanitized failure JSON if further help is needed.
+
+The Google SDK's auth methods set their own retry configuration. The adapter now
+explicitly sets both retry=false and retryConfig.retry=0, with no network retries,
+so a one-time code is not silently replayed after an uncertain exchange. OAuth
+requests retain verified TLS, a timeout and redirect refusal. No actual live
+exchange/profile/message request was performed while diagnosing the reported
+failure; a sanitized user-run retry is required to identify its exact discarded
+historical provider error.

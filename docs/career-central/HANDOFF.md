@@ -1,5 +1,30 @@
 # Latest handoff
 
+## Gmail post-callback diagnostics — 2026-11-10
+
+See [CC-010](tasks/CC-010.md) and [Gmail troubleshooting](../GMAIL.md).
+User's old callback page confirms state/code acceptance by WSL. Current synthetic
+Windows-to-WSL forwarding passed, and credential-free public Google HTTPS checks
+succeeded. No private config/credentials, live code exchange, Gmail profile or
+messages were accessed; user prohibited mailbox access during diagnosis.
+
+Added sanitized per-stage diagnostics and a --diagnostics flag. Callback success
+no longer implies authentication success in the browser page. Listener lifetime
+and IPv4-only binding are verified through pending verification and cleanup.
+Fixed SDK auth retry overrides with explicit retryConfig.retry=0/no retries;
+one-time code exchange cannot silently replay after uncertain outcome. A closed
+API-disabled error signal is recognized without logging provider text. PKCE,
+state, exact Gmail readonly/audience/account checks and private storage remain.
+261 offline checks pass, including 12 actual-SDK/synthetic-response regressions.
+No Windows network settings, OAuth permissions, credentials or mailbox changed.
+
+The exact downstream historical error was discarded by the old generic handler;
+do not invent its cause or claim live sign-in is fixed/verified. Next step is the
+user's fresh authorized one-hour/10-ID retry with --diagnostics using existing
+private config. Ask only for sanitized failure JSON if needed, never callback
+parameters or credentials. No agent live connection or mailbox read is authorized
+by the diagnostic request. Older entries below are historical.
+
 ## Dedicated Gmail receiver — 2026-11-10
 
 See [CC-009](tasks/CC-009.md) and [Gmail setup/runbook](../GMAIL.md).

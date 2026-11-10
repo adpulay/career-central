@@ -1,5 +1,11 @@
 # Verified project state
 
+Latest Gmail diagnostic slice (2026-11-10): [CC-010](tasks/CC-010.md) adds safe
+stage/category diagnostics, synthetic localhost checking and explicit no-retry
+SDK transport. 261 offline checks pass; current Windows-to-WSL/public HTTPS probes
+passed without OAuth or mailbox requests. Historical post-callback provider cause
+remains unknown until the user's sanitized retry. No private account was accessed.
+
 Latest dedicated Gmail slice (2026-11-10): [CC-009](tasks/CC-009.md) adds a
 consent-gated, session-only Gmail readonly adapter alongside Outlook. 249 offline
 checks pass; no actual account/config/credential/mailbox was accessed. User
