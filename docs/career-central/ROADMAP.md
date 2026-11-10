@@ -11,7 +11,7 @@
 | M3C platform recovery and secure Microsoft Graph storage | Complete locally | [CC-005](tasks/CC-005.md); WSL/Linux tested, native Windows and working Linux Secret Service remain unvalidated; live Graph remains separate |
 | Local M3D preparation | Implemented locally | [CC-006](tasks/CC-006.md); bounded sync coordinator with fictional integration and recovery tests; no live entry point |
 | Interrupted sync reconciliation | Implemented locally | [CC-007](tasks/CC-007.md); explicit worker-stop acknowledgment and revision-guarded abandonment; no observation replay |
-| Dedicated Gmail receiver | Implemented locally; connection unauthorized | [CC-009](tasks/CC-009.md); Gmail readonly OAuth, redirected-message matching, shared bounded sync, no-billing setup and explicit connection gate |
+| Dedicated Gmail receiver | Controlled live list verified; classification pending | [CC-011](tasks/CC-011.md); actual user-operated HTTP 200 list and complete bounded checkpoint; one hour/10 IDs/one page; no autonomous actions |
 | M3D live read-only Outlook connection | Controlled command implemented; live acceptance pending | [CC-008](tasks/CC-008.md); session-only interactive first read or separately validated protected storage; user registration/sign-in/consent required; no live run yet |
 | Native verification-session continuation | Proposed, not authorized | Live session retention, sender validation, exact code-use approval |
 | Hybrid cloud vertical slice / worker transport | Proposed, not authorized | API/data ownership/auth/cost approval; no provisioning now |

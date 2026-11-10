@@ -8,6 +8,7 @@
   },
   "scripts": {
     "doctor": "node doctor.mjs",
+    "gmail": "node scripts/gmail-email.mjs first-sync",
     "ui": "node scripts/ui-server.mjs",
     "or": "node openrouter-runner.mjs",
     "or:scan": "node openrouter-runner.mjs scan",

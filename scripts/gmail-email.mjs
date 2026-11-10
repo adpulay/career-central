@@ -14,6 +14,7 @@ import {writePrivate} from '../lib/email/outlook-auth.mjs';
 import {loadGoogleDesktopClient, createGmailAuth} from '../lib/email/gmail-auth.mjs';
 import {readGmailConfiguration, validateGmailConfiguration} from '../lib/email/gmail-configuration.mjs';
 import {runControlledGmailSync} from '../lib/email/gmail-sync.mjs';
+import {sanitizeGmailDiagnostic} from '../lib/email/gmail-diagnostics.mjs';
 import {sanitizeOAuthDiagnostic} from '../lib/email/oauth-diagnostics.mjs';
 import {inspectMailboxSyncRecovery, abandonInterruptedMailboxSync} from '../lib/email/sync-recovery.mjs';
 
@@ -27,7 +28,7 @@ async function locked(file, action) {
 async function main() {
   const {values, positionals} = parseArgs({allowPositionals: true, options: {
     account: {type: 'string'}, 'application-email': {type: 'string'}, 'client-file': {type: 'string'},
-    diagnostics: {type: 'boolean', default: false}, hours: {type: 'string'}, 'authorize-connection': {type: 'boolean', default: false},
+    diagnostics: {type: 'boolean', short: 'd', default: false}, hours: {type: 'string'}, 'authorize-connection': {type: 'boolean', short: 'a', default: false},
     'job-key': {type: 'string'}, sender: {type: 'string'}, 'run-id': {type: 'string'},
     'expected-revision': {type: 'string'}, 'acknowledge-worker-stopped': {type: 'boolean', default: false},
   }});
@@ -74,7 +75,8 @@ async function main() {
   await locked(path.join(directory, 'session.lock'), async () => {
     try {
       const result = await runControlledGmailSync({root, config, auth, authorizeConnection: true,
-        mode: command === 'preview' ? 'preview' : 'sync', hours: values.hours === undefined ? 1 : Number(values.hours),
+        mode: command === 'preview' ? 'preview' : 'sync',
+        onSyncDiagnostic: values.diagnostics ? event => console.error(JSON.stringify({syncDiagnostic: event})) : undefined, hours: values.hours === undefined ? 1 : Number(values.hours),
         onUrl: url => console.log('Open this Google sign-in URL locally; keep the terminal running:\n' + url)});
       console.log(JSON.stringify(result, null, 2));
       if (result.incomplete) process.exitCode = 2;
@@ -88,7 +90,9 @@ main().catch(error => {
     'SYNC_RECONCILIATION_REQUIRED', 'SYNC_CONTEXT_CONFLICT', 'SYNC_BACKOFF_ACTIVE', 'STALE_STATE_REVISION',
     'WORKER_STOP_ACKNOWLEDGMENT_REQUIRED', 'SYNC_RECOVERY_CONTEXT_CONFLICT', 'INVALID_RECOVERY_REQUEST']);
   const diagnostic = sanitizeOAuthDiagnostic(error?.oauthDiagnostic);
+  const syncDiagnostic = sanitizeGmailDiagnostic(error?.gmailDiagnostic);
   console.error(JSON.stringify({error: allowed.has(error?.code) ? error.code : 'GMAIL_OPERATION_FAILED',
     ...(diagnostic ? {oauthDiagnostic: diagnostic} : {}),
+    ...(syncDiagnostic ? {syncDiagnostic} : {}),
     automaticStatusChanges: false, submittedApplications: 0})); process.exitCode = 1;
 });

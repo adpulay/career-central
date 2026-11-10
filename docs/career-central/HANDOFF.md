@@ -1,5 +1,32 @@
 # Latest handoff
 
+## Gmail provider failure fixed; controlled live list verified — 2026-11-10
+
+See [CC-011](tasks/CC-011.md). Safe diagnostics identified the actual failure:
+a user-operated Gmail message-list GET returned HTTP 204 No Content, and the
+adapter tried to JSON-decode its empty body. The generic provider error was a
+response parsing failure, not OAuth/permissions/WSL forwarding. The list now
+includes resultSizeEstimate; 204/ambiguous empty JSON is incomplete without
+checkpoint advancement, while explicit zero-result JSON can complete a window.
+
+The user's subsequent real message-list GET returned HTTP 200 with validated
+response and idle/incomplete=false. A sanitized local health read corroborated
+the complete checkpoint. This verifies actual bounded list access, not live
+sender provenance, forwarding/classification or application outcomes. No private
+messages, addresses, IDs, times, codes or credentials are reproduced here.
+
+Added safe sync-stage/reason diagnostics and one-hour maximum enforcement;
+10-ID/one-page limits, exact readonly OAuth, CAS/replay/dedup, Outlook state and
+all submission/code-use/status gates remain. Short retry command:
+`npm run gmail -- -a -d`. Diagnostics alone never authorize; -a is explicit.
+278 offline tests pass, including 17 new provider regressions. No new dependency,
+permission, cloud/billing, browser automation or message modification occurred.
+Agent work used local sanitized health and fictional tests; actual mailbox
+requests were initiated by the user in their terminal under explicit flags.
+Next work can validate selective redirected-message matching with user-selected
+sender/job rules; that remains separate from the now-passing list acceptance.
+Earlier entries below describe historical pending states.
+
 ## Gmail post-callback diagnostics — 2026-11-10
 
 See [CC-010](tasks/CC-010.md) and [Gmail troubleshooting](../GMAIL.md).

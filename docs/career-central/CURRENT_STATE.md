@@ -17,3 +17,8 @@ Connection is explicitly unauthorized pending user consent and OAuth setup.
 adds sanitized OAuth stages plus retry/listener fixes. 261 offline checks pass.
 Windows-to-WSL synthetic forwarding passed; no agent mailbox access occurred.
 The old downstream provider error requires a fresh user-run diagnostic retry.
+
+[CC-011](tasks/CC-011.md) resolves the confirmed HTTP 204 JSON parse failure.
+User-run Gmail message-list HTTP 200 and a complete local checkpoint are now
+verified; 278 offline checks pass. Live forwarded-message classification remains
+separate. The controlled command is `npm run gmail -- -a -d`.

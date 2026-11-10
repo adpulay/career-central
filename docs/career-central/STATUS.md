@@ -1,5 +1,12 @@
 # Verified project state
 
+Latest Gmail provider slice (2026-11-10): [CC-011](tasks/CC-011.md) fixes JSON
+parsing of HTTP 204 and retains explicit zero-result list metadata. A subsequent
+user-operated actual Gmail message-list GET passed with HTTP 200, validated
+response, idle/incomplete=false and a corroborated complete local checkpoint.
+278 offline checks pass. This is bounded list acceptance; live forwarded-message
+classification and sender provenance remain unvalidated. No autonomous actions.
+
 Latest Gmail diagnostic slice (2026-11-10): [CC-010](tasks/CC-010.md) adds safe
 stage/category diagnostics, synthetic localhost checking and explicit no-retry
 SDK transport. 261 offline checks pass; current Windows-to-WSL/public HTTPS probes

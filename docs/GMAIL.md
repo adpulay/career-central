@@ -5,7 +5,10 @@ integration. Keep the existing application email as the original recipient;
 configure a separate receiving Gmail account. Personal addresses belong only in
 private runtime configuration, never this runbook or shared project docs.
 
-No account has been connected or read during development. Setup is offline.
+Initial development used fictional responses. The user-run controlled message-list
+acceptance now passed with HTTP 200 and a complete bounded checkpoint; see
+[CC-011](career-central/tasks/CC-011.md). This does not validate live sender
+provenance or forwarded-message classification. Local setup remains offline.
 Live commands require an explicit `--authorize-connection` flag in addition to
 normal Google browser sign-in and consent. An agent must separately obtain the
 user's explicit connection authorization before invoking those commands.
@@ -117,11 +120,12 @@ from application classification, not treated as a recruiting verification.
 
 ## First controlled sync — only after explicit connection authorization
 
-The following command starts Google OAuth and then a bounded mailbox read.
+The following short command starts Google OAuth and then a bounded mailbox read.
+`-a` explicitly authorizes the connection; `-d` enables sanitized diagnostics.
 Do not invoke it as an agent until the user explicitly authorizes that connection:
 
 ```sh
-node scripts/gmail-email.mjs first-sync --hours 1 --authorize-connection
+npm run gmail -- -a -d
 ```
 
 Open the printed Google URL in a local browser, select only the dedicated Gmail
@@ -134,7 +138,7 @@ permission. Denial stops the operation. Account mismatch or extra granted scopes
 fails before any message listing; a read-only profile request verifies identity.
 
 Default window: one hour ending when the command starts; maximum permitted
-lookback: 24 hours. Limits: one ID-list page of at most 10 distinct message IDs,
+lookback: one hour. Limits: one ID-list page of at most 10 distinct message IDs,
 up to 10 metadata GETs, and up to 10 detail GETs for approved application-envelope
 matches. One identity-only profile GET also occurs after scope validation. The
 adapter never follows a next-page token or automatically retries mailbox reads.
@@ -272,3 +276,44 @@ requests retain verified TLS, a timeout and redirect refusal. No actual live
 exchange/profile/message request was performed while diagnosing the reported
 failure; a sanitized user-run retry is required to identify its exact discarded
 historical provider error.
+
+## Provider synchronization diagnostics and HTTP 204 fix
+
+A user-run message-list request completed with HTTP 204 No Content. The old
+adapter called response.json() on that empty body and mislabeled the JSON parse
+failure as a generic provider error. This was after successful OAuth/profile
+verification, so changing scope, credentials or WSL forwarding was unnecessary.
+
+The list field selection now includes resultSizeEstimate alongside message IDs
+and nextPageToken, preserving the explicit zero-result indicator. In the live
+user retry, Google returned HTTP 200, the response validated, synchronization
+finished idle/incomplete=false, and the local provider checkpoint was confirmed
+complete. No message content or credentials were logged. Live classification of
+redirected recruiting mail remains separate acceptance; an empty-window list
+success is not sender-authentication or classification proof.
+
+HTTP 204 is never JSON-decoded. If Google returns it again, the adapter reports
+response_empty and keeps coverage incomplete without advancing a successful
+checkpoint. An uninformative {} response is also incomplete. A valid JSON list
+with resultSizeEstimate=0 can complete an empty window; a positive estimate with
+no IDs, null collection, malformed response, permission error or parser failure
+cannot fabricate coverage. There is no automatic retry or second-page request.
+
+Optional syncDiagnostic lines identify message_list, message_metadata,
+metadata_parse, message_detail, detail_parse, observation_persistence and
+checkpoint_publication. They use only fixed categories/reason codes and optional
+HTTP status. They never contain IDs, query values, addresses, selected headers,
+subjects, body text, codes or tokens. HTTP request_succeeded is distinct from
+response_validated and the final synchronization result. API 400, 401, 403,
+429/5xx, JSON failures and local publication conflicts remain distinguishable.
+
+Use this short command as one shell line from the repository root:
+
+```sh
+npm run gmail -- -a -d
+```
+
+It still requires explicit authorization, defaults to one hour, permits at most
+one hour, caps at 10 message IDs and one page, and keeps every application action
+disabled. Do not paste wrapped fragments of a filename or flags as separate shell
+commands. The direct CLI supports the equivalent -a/-d aliases if desired.
