@@ -1,5 +1,39 @@
 # Verified project state
 
+## Current summary — product alignment, 2026-11-10
+
+The [feature inventory](FEATURE_INVENTORY.md) is the detailed capability/status map.
+M0.5–M3C are completed local foundation slices, not a completed career platform.
+Existing discovery/documents/analytics/interview code is substantial but fragmented;
+agent protocols are not general background services or validated product journeys.
+The [roadmap](ROADMAP.md) now prioritizes reliable shortlist → small core priority
+monitor/rapid preparation → one complete approved application → confirmations,
+then ATS breadth, documents, dashboard, communication, interview/learning, gated
+autonomy and mobile/cloud. See [CC-014](tasks/CC-014.md).
+
+Current live evidence: user-operated bounded Gmail list/context succeeded, Gmail
+accepted the reviewed reply, and the user confirmed delivery in the same thread.
+This completes the controlled test round trip only. Generic recruiting-message
+classification, mail-to-status bridge and background sync are still partial.
+The narrow Greenhouse preparation/review transport lacks a confirmed real
+end-to-end application; HTTP 428/uncertain prior attempts require reconciliation.
+No new live action was performed to prepare this summary.
+
+[CC-015](tasks/CC-015.md) and [CC-016](tasks/CC-016.md) are planned, not implemented.
+Continuous adaptive monitoring, deduplicated alert/preparation lifecycle and PWA/
+cloud are not delivered. Autonomous submissions, recurring monitoring, automatic
+codes/replies, new notification sends and provisioning remain unauthorized.
+Existing per-action approval and security controls are unchanged.
+
+Validation for this documentation-only audit is link/reference/consistency and
+diff review; no runtime test/build/scan/mailbox/browser action was run. Historical
+test counts below apply to their original source snapshots and scopes.
+
+## Historical milestone acceptance records
+
+Earlier entries preserve contemporaneous statements (including pending live tests
+and uncommitted working trees); Git and the summary above establish current state.
+
 ## Bounded reply context — 2026-11-10
 
 [CC-013](tasks/CC-013.md): user reports test send/delivery succeeded, initially

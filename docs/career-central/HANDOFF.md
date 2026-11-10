@@ -1,5 +1,47 @@
 # Latest handoff
 
+## Product vision, priorities and core monitoring aligned — 2026-11-10
+
+[CC-014](tasks/CC-014.md) is a documentation-only source audit and planning slice.
+The broad vision existed in the original architecture audit but was compressed
+out of PRODUCT/ROADMAP. Expanded [PRODUCT](PRODUCT.md), [FEATURE_INVENTORY](FEATURE_INVENTORY.md)
+(F01–F59), [ROADMAP](ROADMAP.md), [BACKLOG](BACKLOG.md) and [ADR 0002](decisions/0002-product-workflow-priorities.md)
+now distinguish executable components, partial workflows, validation level and
+execution authority. Completed M milestones/contracts remain intact. Historical
+M4–M8 proposals are cross-referenced, not silently renumbered or marked complete.
+
+Core continuous monitoring/rapid preparation is early P1b: supported priority
+feeds, desired adaptive 5/15/30–60 minute cadence under rate limits, distinct
+first-seen/publication/change identities, durable checkpoints/leases, one alert/
+preparation proposal per relevant event, pause/restart and evidence-aware latency
+metrics. Baseline feeds cannot create “just published” claims. No recurring
+operation or external channel/application action is activated by planning.
+
+Recommend [CC-015](tasks/CC-015.md) next: minimal reliable shortlist/shared filter/
+identity/explanation and reviewed fixtures, then [CC-016](tasks/CC-016.md): 3–5
+approved employers, durable dashboard alerts and local preparation proposals.
+Do not wait for broad infrastructure, every provider or full AI matching before
+that useful monitor slice. P2 closes one complete approved application with
+required human verification/receipt reconciliation; P3 broadens confirmations.
+Existing source owners, gates and approved documents are preserved.
+
+Live acceptance update from the conversation: user confirmed the reviewed Gmail
+reply was delivered in the same conversation. Record this as user-reported
+controlled round-trip success, not independent agent verification or accepted
+recruiting classification. Prior entries below preserve pending states at the
+time. No mailbox/application/cloud action occurred during this audit.
+
+Personal preferences, writing samples, account identities and raw records remain
+outside shared docs. Existing role weights/target graduation policy are consumed
+from private configuration, not copied into monitor constants.
+
+Validation passed: 13 changed/new Markdown files, 415 local link/anchor targets,
+unique F01–F59 feature IDs and R01–R18 requirement IDs; docs-only scope and
+whitespace checks passed. Original architecture audit body is preserved beneath
+the dated addendum; earlier task files and operational contracts are unchanged.
+No runtime tests/builds/live probes required or run for this documentation slice.
+Local commit requested; no push authorized.
+
 ## Send callback connection-refused follow-up — 2026-11-10
 
 User's bounded reply-context command completed successfully with one body read

@@ -1,5 +1,30 @@
 # Current state entry point
 
+## Current product alignment — 2026-11-10
+
+[STATUS](STATUS.md) is the authoritative implementation/validation summary;
+[FEATURE_INVENTORY](FEATURE_INVENTORY.md) maps every product capability to source
+and completion gaps. The expanded [PRODUCT](PRODUCT.md) and [ROADMAP](ROADMAP.md)
+cover the full career platform, including core continuous monitoring and rapid
+preparation. Infrastructure milestones remain preserved, not relabeled product completion.
+
+Gmail bounded reads and the reviewed same-thread test round trip succeeded by
+user report. Recruiting classification/status reconciliation, complete approved
+application submission, priority monitoring and general reply automation are not
+accepted as complete. Outlook live/native-vault acceptance remains pending.
+No autonomous submissions/replies/codes, recurring monitoring or cloud are enabled.
+
+Next recommended engineering task is [CC-015](tasks/CC-015.md), a minimal reliable
+shortlist/shared eligibility slice, then early [CC-016](tasks/CC-016.md) priority
+monitoring with durable dashboard alerts and local preparation proposals. This
+session changes documentation only. See [latest handoff](HANDOFF.md).
+
+## Historical snapshot entries
+
+The entries below retain their original acceptance states. Later evidence above
+and in STATUS supersedes old pending/authorization statements only for the
+specific actions subsequently reported; it does not broaden execution permission.
+
 [CC-013](tasks/CC-013.md) adds bounded selected-message reply context and a
 controlled round-trip test. User reports reviewed send/delivery succeeded;
 live incoming reply/thread acceptance remains pending. Personal style guidance

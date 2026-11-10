@@ -1,5 +1,27 @@
 # Career Central — Phase 0 repository audit and architecture design
 
+## Product-alignment addendum — 2026-11-10
+
+The detailed Phase 0 audit below is preserved as historical design and source
+inventory. Current scope/status/priorities are in [PRODUCT](../career-central/PRODUCT.md),
+[feature inventory](../career-central/FEATURE_INVENTORY.md), [ROADMAP](../career-central/ROADMAP.md)
+and [ADR 0002](../career-central/decisions/0002-product-workflow-priorities.md).
+Later M0.5–M3C/email tasks implement bounded parts of the foundation; old pending
+commit/live statements below are not the latest implementation state.
+
+The product now explicitly treats continuous priority posting monitoring and rapid
+preparation as core early delivery: [CC-016](../career-central/tasks/CC-016.md).
+Reuse compliant providers/scheduler/dedup/matching, distinguish discovery from
+publication time, and keep checkpoints, alerts and preparation proposals durable.
+Existing scan scheduling is not completion of that monitoring lifecycle. Start
+with a minimum reliable shortlist, a small approved-source monitor and one complete
+approved application; defer generalized email persistence/cloud until a workflow
+requires them. Outlook is preserved; Gmail's controlled round trip is user-reported
+successful. Real recruiting classification, confirmed application acceptance and
+autonomy remain distinct validation/authorization gates. Existing technical and
+security contracts are unchanged; the original M4–M8 proposals have an explicit
+crosswalk in the current roadmap.
+
 Audit date: 2026-11-06. Updated with the user’s hybrid AWS hosting preference and long-term AI context-continuity requirements. Scope: the existing `career-ops` checkout inside `JobScraper`, including its uncommitted application/email extensions. This is a source audit and design proposal, not an implementation or release certification.
 
 Only this document was created during Phase 0. No application feature, dependency, configuration, credential, résumé, profile, record, approval gate or kill-switch setting was changed. No browser, scheduler, application submission, Microsoft authentication or mailbox retrieval was launched. Public Microsoft/standards documentation was researched without accessing a personal account.

@@ -2,7 +2,7 @@
 
 Career Central extends Career Ops into a personal career workspace. Develop locally; target a hybrid AWS dashboard/data plane with outbound-only Windows/WSL automation workers. No deployment or new external application actions are authorized by the current milestone.
 
-Current email continuation: [CC-013](tasks/CC-013.md) adds bounded incoming reply context and a controlled round-trip procedure. User reports [CC-012](tasks/CC-012.md) sending/delivery worked. See [instructions](../GMAIL_SENDING.md). Outlook remains available; live reply threading and recruiting classification require separate acceptance.
+Current continuation: [CC-014](tasks/CC-014.md) aligns the complete product vision and early core monitoring. Review [PRODUCT](PRODUCT.md), [FEATURE_INVENTORY](FEATURE_INVENTORY.md), [ROADMAP](ROADMAP.md) and [BACKLOG](BACKLOG.md). Recommended next implementation: [CC-015](tasks/CC-015.md) minimum reliable discovery/ranking, followed promptly by [CC-016](tasks/CC-016.md) priority monitoring/rapid preparation. Neither task is started by this planning audit. Gmail's controlled round trip is user-reported successful; broader recruiting/application workflows remain partial.
 
 Read in this order:
 
