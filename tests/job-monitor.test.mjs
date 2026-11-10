@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
-import {configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval} from '../lib/career-central/job-monitor.mjs';
+import {configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval, graduationWindow, reevaluatePostings} from '../lib/career-central/job-monitor.mjs';
 import {createFeedReader} from '../lib/career-central/monitor-feed.mjs';
 import {updateLedger} from '../lib/applications/store.mjs';
 const now = Date.parse('2026-11-10T12:00:00Z'), step = 360000;
@@ -285,3 +285,118 @@ test('CLI pause/resume are local controls and first-poll requires explicit conse
   const denied = spawnSync(process.execPath, ['scripts/job-monitor.mjs', 'first-poll', '--source', source.id], {env, encoding: 'utf8'});
   assert.equal(denied.status, 1); assert.match(denied.stderr, /MONITOR_LIVE_NOT_AUTHORIZED/);
 }));
+
+// ---- Eligibility classification regressions (fictional postings) ----
+const evaluate = (extra = {}, ctx = context) => evaluateMonitoredJob({...normalizedJob(), ...extra}, ctx, {}, now);
+const normalizedJob = () => ({id: 'x', company: source.company, title: job().title, location: job().location, url: job().url, requisitionId: 'REQ-1', description: job().description});
+const withProfile = overrides => ({...context, profile: {...profile, ...overrides}});
+test('issue 1: a skill stated as not required is not classified as mandatory', () => {
+  const optional = evaluate({description: job().description + " Required: systems programming. We use Rust extensively, and while experience with the language isn't required a willingness to learn it is."});
+  assert.ok(!optional.match?.unknowns && !optional.unknowns.includes('Required technical skill evidence needs review'));
+  assert.ok(optional.gaps.some(gap => /not established in verified skills: .*Rust/.test(gap)));
+  assert.ok(!optional.gaps.some(gap => /Stated as required/.test(gap)));
+  for (const phrase of ['Rust experience is not required.', 'No prior Rust experience required.', 'Rust is preferred but not required.', 'Rust experience isn’t required.'])
+    assert.ok(!evaluate({description: job().description + ' ' + phrase}).unknowns.includes('Required technical skill evidence needs review'), phrase);
+  const mandatory = evaluate({description: job().description + ' Rust experience is required.'});
+  assert.ok(mandatory.unknowns.includes('Required technical skill evidence needs review'));
+  assert.ok(mandatory.gaps.includes('Stated as required: Rust'));
+  // "Go" is matched as a word, not inside "good".
+  assert.ok(!evaluate({description: job().description + ' We also use Go. Required: good communication.'}).unknowns.includes('Required technical skill evidence needs review'));
+});
+test('issue 2: verified U.S. citizenship in the saved profile satisfies a stated citizenship requirement', () => {
+  const description = job().description + ' This role is fully remote for a candidate based in the United States with US citizenship.';
+  const verified = evaluate({description}, withProfile({authorization: {...profile.authorization, citizenship: {verified: true, value: 'United States citizen'}}}));
+  assert.ok(!verified.unknowns.includes('Citizenship requirement requires verified answer')); assert.equal(verified.evidence.citizenship, 'verified_profile');
+  assert.equal(verified.status, 'qualified');
+  assert.ok(evaluate({description, }).unknowns.includes('Citizenship requirement requires verified answer'), 'work authorization alone is not citizenship');
+  for (const citizenship of [{verified: false, value: 'United States citizen'}, {verified: true, value: 'Not a United States citizen'}, {verified: true, value: 'Canadian citizen'}])
+    assert.ok(evaluate({description}, withProfile({authorization: {...profile.authorization, citizenship}})).unknowns.includes('Citizenship requirement requires verified answer'), citizenship.value);
+  assert.ok(!evaluate({description}, withProfile({authorization: {...profile.authorization, us_citizen: {verified: true, value: true}}})).unknowns.includes('Citizenship requirement requires verified answer'), 'legacy field still honored');
+});
+test('issue 3: vice-president and executive titles fail technical-role filtering', () => {
+  for (const title of ['Vice President, Cloudflare One GTM', 'VP, Platform Engineering', 'SVP Infrastructure', 'Chief Cloud Officer']) {
+    const result = evaluate({title}); assert.equal(result.status, 'excluded', title);
+  }
+  const vp = evaluate({title: 'Vice President, Cloudflare One GTM'});
+  assert.ok(vp.exclusions.includes('Title indicates substantial seniority'));
+  assert.ok(vp.exclusions.includes('Title outside configured technical role families'), 'an employer name containing "cloud" is not a role family');
+  assert.equal(evaluate({title: 'Software Engineer I, Cloudflare Workers'}).status, 'qualified');
+});
+test('issue 4: cloud-finance and other business-function titles fail technical-role filtering', () => {
+  for (const title of ['FP&A Analyst, Cloud Finance', 'Cloud Sales Associate', 'Cloud Marketing Associate', 'Cloud Infrastructure Recruiter', 'Go-to-Market Associate, Cloud']) {
+    const result = evaluate({title}); assert.equal(result.status, 'excluded', title); assert.ok(result.exclusions.includes('Title indicates non-technical business function'), title);
+  }
+  for (const title of ['Cloud Engineer I, New Grad 2027', 'Associate Sales Engineer, Cloud Platform'])
+    assert.ok(!evaluate({title}).exclusions.includes('Title indicates non-technical business function'), title);
+});
+test('issue 5: a posting graduation window that starts after the saved graduation is a conflict', () => {
+  const description = 'Required: graduation date in Fall 2027, Spring 2028, Summer 2028, Fall 2028, Spring 2029 or Summer 2029. Python. Must be authorized to work in the United States.';
+  const intern = evaluate({title: '2027 - Software Engineering Intern, AMER', description});
+  assert.equal(intern.status, 'excluded');
+  assert.ok(intern.exclusions.some(value => /graduation window \(Fall 2027, .*\) excludes saved graduation 2027-05/.test(value)), intern.exclusions.join('; '));
+  const later = evaluate({title: '2027 - Software Engineering Intern, AMER', description}, withProfile({education: [{graduation_month: {value: '2028-05', verified: true}}]}));
+  assert.ok(!later.exclusions.some(value => /graduation window/.test(value))); assert.match(later.evidence.graduation, /^posting_window\+verified_profile/);
+  assert.equal(graduationWindow('Graduating in Fall 2027 or later.', '2027-05').inside, false);
+  assert.equal(graduationWindow('Graduating in Fall 2027 or later.', '2029-05').inside, true);
+  assert.equal(graduationWindow('Graduating between December 2026 and May 2027.', '2027-05').inside, true);
+  assert.equal(graduationWindow('Must graduate before Fall 2027.', '2027-05'), null, 'upper bounds are not parsed as a window');
+  assert.equal(graduationWindow('Graduating in 2027.', '2027-05'), null, 'year-only statements keep the existing year logic');
+  assert.equal(graduationWindow('Graduation date in Fall 2027.', null), null, 'unverified graduation cannot decide');
+});
+test('issue 6: unspecified, month-less or internship employer start dates remain unresolved', () => {
+  const start = 'Employer start or verified availability requires review', base = 'Required: graduating in 2027. Build AWS Docker Python Linux SQL applications.';
+  for (const description of [base, base + ' Start date: Summer 2027.', base + ' Starting in 2027.', base + ' Start date: flexible.', base + ' Starting in May or June 2027.']) {
+    const result = evaluate({description}); assert.ok(result.unknowns.includes(start), description); assert.ok(!result.exclusions.includes('Explicit start precedes verified availability'), description);
+  }
+  const intern = evaluate({title: 'Software Engineering Intern 2027', description: base + ' Starting in May 2027.'});
+  assert.ok(intern.unknowns.includes(start)); assert.ok(!intern.exclusions.includes('Explicit start precedes verified availability'), 'full-time availability does not govern an internship');
+  assert.ok(!evaluate({description: base + ' Starting in June 2027.'}).unknowns.includes(start));
+  assert.ok(evaluate({description: base + ' Starting in May 2027.'}).exclusions.includes('Explicit start precedes verified availability'));
+  assert.ok(evaluate({description: base + ' Starting in June 2027.'}, withProfile({standardAnswers: {full_time_start: {value: '2027-06', verified: true, provisional: true}}})).unknowns.includes(start));
+});
+test('issue 6: same-month start equals availability in every timezone', () => {
+  const script = `import {evaluateMonitoredJob} from './lib/career-central/job-monitor.mjs';
+    const r = evaluateMonitoredJob({id: 'x', company: 'Fictional', title: 'Software Engineer I', location: 'Dallas, TX', url: 'https://example.invalid/j/1', description: 'Starting in June 2027.'},
+      {policy: {discovery: {}}, profile: {education: [], standardAnswers: {full_time_start: {value: '2027-06', verified: true}}}, portals: {}, history: []}, {}, ${now});
+    console.log(JSON.stringify(r.exclusions));`;
+  for (const TZ of ['Pacific/Kiritimati', 'UTC', 'Pacific/Pago_Pago']) {
+    const out = spawnSync(process.execPath, ['--input-type=module', '-e', script], {env: {...process.env, TZ}, encoding: 'utf8'});
+    assert.equal(out.status, 0, out.stderr); assert.ok(!JSON.parse(out.stdout).includes('Explicit start precedes verified availability'), TZ);
+  }
+});
+test('issue 7: cached descriptions are labeled and never resolve current eligibility', () => fixture(async root => {
+  await configureSources(root, [source]); await poll(root, [job()], now, {mode: 'cache'});
+  const cached = Object.values(readMonitor(root).postings)[0];
+  assert.equal(cached.match.status, 'needs_review'); assert.equal(cached.match.evidence.description, 'cached_snapshot');
+  assert.ok(cached.match.unknowns.includes('Cached job description is not current eligibility evidence; verify the live posting'));
+  await poll(root, [job()], now + step, {mode: 'live', authorizeLiveRead: true});
+  const live = Object.values(readMonitor(root).postings)[0];
+  assert.equal(live.match.status, 'qualified'); assert.equal(live.match.evidence.description, 'live_feed');
+}));
+test('issue 7: offline re-evaluation uses only hash-verified text and ages live content into a stale snapshot', () => fixture(async root => {
+  await configureSources(root, [source]); await poll(root, []);
+  const long = job().description + ' Details.'.repeat(200);
+  await poll(root, [job('101', {description: long}), job('102', {description: long}), job('103', {title: 'Vice President, Cloud GTM'})], now + step, {mode: 'live', authorizeLiveRead: true});
+  await setMonitorDecision(root, {postingId: monitorView(root).jobs[0].id, decision: 'interested'});
+  const before = readMonitor(root), ledgerFile = path.join(root, 'data/application-automation/ledger.json');
+  const beforeLedger = JSON.parse(fs.readFileSync(ledgerFile, 'utf8'));
+  const descriptions = new Map([['greenhouse:fictional:101', long], ['greenhouse:fictional:102', long + ' Edited later.'], ['greenhouse:fictional:103', job().description]]);
+  const fresh = await reevaluatePostings({root, context, descriptions, now: now + step * 2});
+  assert.deepEqual(fresh.evidence, {live_feed: 2, stored_excerpt: 1}); assert.equal(fresh.unavailable, 0);
+  const byPosting = id => Object.values(readMonitor(root).postings).find(row => row.postingId === id);
+  assert.equal(byPosting('101').match.status, 'qualified');
+  assert.ok(byPosting('102').match.unknowns.includes('Only a stored description excerpt is available; full current requirements need review'), 'unverified cache text is not used');
+  assert.equal(byPosting('103').match.status, 'excluded');
+  const stale = await reevaluatePostings({root, context, descriptions, now: now + step + 86400001});
+  assert.deepEqual(stale.evidence, {cached_snapshot: 2, stored_excerpt: 1});
+  assert.ok(byPosting('101').match.unknowns.includes('Cached job description is not current eligibility evidence; verify the live posting'));
+  const after = readMonitor(root), afterLedger = JSON.parse(fs.readFileSync(ledgerFile, 'utf8'));
+  assert.deepEqual(after.alerts, before.alerts); assert.deepEqual(after.preparationTasks, before.preparationTasks); assert.deepEqual(after.sources, before.sources);
+  assert.deepEqual(Object.values(after.postings).map(row => [row.id, row.decision, row.contentHash, row.firstSeenAt, row.availability]), Object.values(before.postings).map(row => [row.id, row.decision, row.contentHash, row.firstSeenAt, row.availability]));
+  assert.deepEqual(afterLedger.jobs, beforeLedger.jobs); assert.deepEqual(afterLedger.events, beforeLedger.events);
+}));
+test('issue 1: negation is scoped to the skill mention, not a long run-on requirement block', () => {
+  const block = 'Required: Experience working with Go, Python, Java, or equivalent programming languages Knowledge of SQL and common relational database systems such as PostgreSQL and MySQL Experience with dashboards and reporting tools is preferred';
+  assert.ok(evaluate({description: job().description + ' ' + block}).unknowns.includes('Required technical skill evidence needs review'));
+  assert.ok(!evaluate({description: job().description + ' Required: production-quality code in Go (or other languages with a willingness to learn Go).'}).unknowns.includes('Required technical skill evidence needs review'));
+});

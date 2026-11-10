@@ -35,6 +35,8 @@ npm run monitor -- seed-cache --source cloudflare
 npm run monitor -- schedule --source cloudflare --minutes 15
 ```
 
+`npm run monitor -- reevaluate` re-applies the current evaluator and saved profile to stored postings offline: no network, alerts, tasks, decisions, checkpoints or application records change. Stored postings keep only a description excerpt, so full text from `data/discovery/raw-latest.json` is used only when its content hash equals the posting's latest observed hash. Evidence is labeled per posting: `live_feed` (hash-verified live content from a check under 24 hours old), `cached_snapshot` (cache-seeded, no longer listed, or a live check over 24 hours old) or `stored_excerpt` (no verifiable full text). The last two always keep the posting in review; neither is current eligibility evidence. Postings with no verifiable text keep their previous result and are counted as `unavailable`.
+
 Configuration file is an array, at most five sources. Example (not itself authorization):
 
 ```json

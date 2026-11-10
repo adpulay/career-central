@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {parseArgs} from 'node:util';
 import {getCareerOpsRoot} from '../path-resolver.mjs';
 import {checkPath} from '../web/src/lib/core/operational-files.mjs';
-import {configureSources, pollSource, loadMatchingContext, monitorView, setMonitorDecision, seedCachedShortlist, setMonitorInterval} from '../lib/career-central/job-monitor.mjs';
+import {configureSources, pollSource, loadMatchingContext, monitorView, setMonitorDecision, seedCachedShortlist, reevaluatePostings, setMonitorInterval} from '../lib/career-central/job-monitor.mjs';
 import {createFeedReader} from '../lib/career-central/monitor-feed.mjs';
 const fail = code => Object.assign(Error(code), {code});
 const {values, positionals} = parseArgs({allowPositionals: true, options: {file: {type: 'string'}, source: {type: 'string'},
@@ -20,6 +20,7 @@ async function main() {
   }
   if (command === 'decide') return setMonitorDecision(root, {postingId: values.posting, decision: values.decision});
   if (command === 'seed-cache') return seedCachedShortlist({root, sourceId: values.source});
+  if (command === 'reevaluate') return reevaluatePostings({root});
   if (command === 'schedule') return setMonitorInterval(root, values.source, Number(values.minutes));
   if (command === 'pause' || command === 'resume') return setMonitorDecision(root, {pausedSource: values.source, paused: command === 'pause'});
   if (command === 'poll-once' || command === 'first-poll') {

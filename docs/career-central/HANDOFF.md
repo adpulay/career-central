@@ -1,5 +1,23 @@
 # Latest handoff
 
+## Eligibility classification and cached-evidence fixes — 2026-11-10
+
+State at start: the interrupted session had left uncommitted, passing hardening for the first live baseline after cache seeding: `first-poll`, pause/resume CLI, a dashboard cache warning and a cache browser suite. Saved sources already had live-feed checkpoints. This was validated and committed separately before the eligibility fixes. No eligibility code had been started.
+
+Fixed in `lib/applications/discovery.mjs` (shared title filter) and `lib/career-central/job-monitor.mjs` (monitor eligibility):
+
+- **Optional skills:** a negated or optional skill mention is no longer mandatory. The negation check is scoped to each mention, and "Go" no longer matches "good".
+- **Citizenship:** verified `authorization.citizenship` is recognized; work authorization alone still is not.
+- **Title filter:** executive titles (VP/president/chief) and business-function titles (finance, GTM, sales, marketing, recruiting, legal) are excluded, and `\bcloud\b` no longer matches employer names.
+- **Graduation windows:** an explicit window that excludes the verified graduation month is an exclusion. Upper-bound, winter and year-only wording falls back to the earlier logic.
+- **Start dates:** compared at month precision. Unstated, month-less and internship starts stay unresolved.
+- **Evidence labels:** `evidence.description` labels cached snapshots and stored excerpts as review-only.
+- **Rerun command:** new offline `reevaluate` command and `reevaluatePostings` owner function.
+
+The real-data rerun and validation results are in [STATUS](STATUS.md). Résumés, application history, monitor checkpoints and email state are unchanged by fingerprint.
+
+Next safe action: the user reviews the 28 needs-review postings. Live content counts as current for 24 hours: re-running `reevaluate` after that labels every posting a cached snapshot until an authorized bounded `poll-once` refreshes it. A business-operations associate title is still admitted as infrastructure-family. It was left unchanged because it wasn't one of the reported issues; tighten it only if the user wants. Recurring monitoring, live polling, emails and applications remain unauthorized by this work.
+
 ## Minimum shortlist-to-alert implementation — 2026-11-10
 
 Implemented [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) local vertical slice;

@@ -1,5 +1,22 @@
 # Verified project state
 
+## Eligibility classification and evidence fixes — 2026-11-10
+
+Monitor eligibility now:
+
+- Treats a skill as required only when a requirement excerpt names it without a nearby negation.
+- Reads verified citizenship from `authorization.citizenship`, the field the Greenhouse mapper already uses.
+- Excludes executive titles and non-technical business-function titles; employer names containing "cloud" no longer count as a role family.
+- Excludes explicit season/month graduation windows that exclude the verified graduation month.
+- Compares employer start dates at month precision, independent of timezone. Unstated, month-less and internship starts stay unresolved.
+- Labels description evidence. Cached snapshots and stored excerpts cannot count as current eligibility evidence.
+
+A new offline `npm run monitor -- reevaluate` re-applies the evaluator to stored postings. It uses full text only when the text's hash equals the latest observed content hash; see the [runbook](../JOB_MONITOR.md).
+
+Real-data rerun (offline, no network): 1,204 postings re-evaluated and 103 kept unchanged with no verifiable text. The reviewable shortlist went from 31 to 28. The three wrongly admitted postings (an executive go-to-market title, a cloud-finance analyst title and an internship with a later graduation window) are now excluded. A citizenship-requirement posting no longer asks for a verified answer, and a posting stating that Rust experience isn't required no longer flags Rust as mandatory. All 28 still show the employer start as unresolved. One posting is flagged as having only a stored excerpt. Zero qualified; scores remain heuristic. Fingerprints confirmed unchanged: application jobs/events, email inbox/health/sends, monitor sources/checkpoints/alerts/tasks/decisions, tracker, CV, profile/policy, output résumés and the discovery cache.
+
+Validation: 391 relevant Node regressions passed, zero failures/skips (50 monitor cases, 14 new for these issues). Typecheck/build and the job-monitor, job-monitor-cache and career-central production-browser suites passed on fictional data. A read-only production dashboard check on the real data root (GET-only, off-origin blocked) at 375/1440px found 28 cards, each showing incomplete eligibility, none of the three excluded postings, no writes, no external requests and no page errors. No live feed request, email, application, recurring monitor or cloud action occurred.
+
 ## Current implementation — shortlist and local monitor, 2026-11-10
 
 [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) now deliver a minimum local
