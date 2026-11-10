@@ -10,6 +10,7 @@
 | M3B operational persistence and recovery | Complete locally | [CC-004](tasks/CC-004.md); metadata round trips, typed CAS/replay publishers, atomic/recovery tests and health display |
 | M3C platform recovery and secure Microsoft Graph storage | Complete locally | [CC-005](tasks/CC-005.md); WSL/Linux tested, native Windows and working Linux Secret Service remain unvalidated; live Graph remains separate |
 | Local M3D preparation | Implemented locally | [CC-006](tasks/CC-006.md); bounded sync coordinator with fictional integration and recovery tests; no live entry point |
+| Interrupted sync reconciliation | Implemented locally | [CC-007](tasks/CC-007.md); explicit worker-stop acknowledgment and revision-guarded abandonment; no observation replay |
 | M3D live read-only Outlook connection | Proposed, not authorized | Requires user approval, supported OS vault validation, existing-account legacy cache review, read-only OAuth consent and bounded live sync acceptance |
 | Native verification-session continuation | Proposed, not authorized | Live session retention, sender validation, exact code-use approval |
 | Hybrid cloud vertical slice / worker transport | Proposed, not authorized | API/data ownership/auth/cost approval; no provisioning now |

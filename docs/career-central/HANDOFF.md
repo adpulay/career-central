@@ -1,5 +1,27 @@
 # Latest handoff
 
+## Interrupted sync reconciliation — 2026-11-10
+
+Readiness and bounded sync are committed at `7ca248e4` (local only; no push).
+Added [CC-007](tasks/CC-007.md): local redacted recovery inspection plus explicit
+abandonment of a recorded syncing run. CLI is
+`node scripts/outlook-sync-recovery.mjs status` or `abandon` with run ID,
+expected revision and `--acknowledge-worker-stopped`. No command was run against
+actual private data; CLI tests use temporary fictional data roots.
+
+Recovery uses the existing mailbox owner writer/CAS and preserves observations,
+application states, account/scope and the last successful checkpoint. It never
+replays inspection or claims completed coverage. Worker-stop acknowledgment is
+human supplied, not a verified lease. Repeated/stale/wrong-run requests refuse
+writes. Legacy mailbox metadata remains untouched for review. No live command,
+OAuth, mailbox read, dependency installation, deployment or submission is enabled.
+
+Final verification: 98 focused tests passed, 0 failed; whitespace check passed.
+Next local work: provider-record and bounded-coverage validation in inspection,
+using fictional provider responses before live entry-point integration. Native
+vault/account-binding validation and live M3D acceptance remain unrun. Older
+uncommitted-state notes below describe their original session checkpoints.
+
 ## Bounded sync continuation — 2026-11-10
 
 Implemented the local bounded sync coordinator; see [CC-006](tasks/CC-006.md).

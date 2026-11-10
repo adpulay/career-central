@@ -1,5 +1,9 @@
 # Verified project state
 
+Latest reconciliation slice (2026-11-10): [CC-007](tasks/CC-007.md) adds explicit
+interrupted-sync inspection/abandonment using existing owner-store CAS. 98 focused
+tests pass, 0 fail; no live integration. CC-006 is committed as `7ca248e4`.
+
 Latest local continuation (2026-11-10): foundation checkpoint `e7ce36f9` is committed
 and verified on the private remote. New uncommitted readiness and bounded sync
 work is documented in [CC-006](tasks/CC-006.md) and [HANDOFF](HANDOFF.md): 90

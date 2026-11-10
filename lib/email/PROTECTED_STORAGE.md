@@ -37,3 +37,14 @@ with a three-second subprocess timeout; it does not construct persistence or ope
 configuration/cache files. A present service and loadable extension are only
 prerequisites. The command deliberately cannot certify a save/restart/load,
 interruption or cross-user isolation test, and never authorizes live sign-in.
+
+## Interrupted bounded sync recovery
+
+`node scripts/outlook-sync-recovery.mjs status` reads only bounded owner metadata
+and reports a redacted recovery candidate. It does not open credentials, message
+content or configuration, and does not independently verify worker liveness.
+After stopping the original worker, explicit `abandon --run-id ID
+--expected-revision N --acknowledge-worker-stopped` records failed/incomplete
+through the existing mailbox writer, preserving the successful checkpoint.
+It never replays mail inspection or observation persistence. A fresh sync is a
+separate invocation. See [CC-007](../../docs/career-central/tasks/CC-007.md).
