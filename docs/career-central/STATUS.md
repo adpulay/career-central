@@ -1,5 +1,11 @@
 # Verified project state
 
+Latest Outlook readiness slice (2026-11-10): [CC-008](tasks/CC-008.md) wires an
+explicit same-process first sign-in/sync with a one-page/10-message/24-hour cap,
+strict delegated read scopes and review-only observations. 223 offline checks
+pass; native vault and live Microsoft acceptance remain unrun. Exact user steps:
+[Outlook runbook](../OUTLOOK.md). Prior checkpoint `a97b6249` verified complete.
+
 Latest reconciliation slice (2026-11-10): [CC-007](tasks/CC-007.md) adds explicit
 interrupted-sync inspection/abandonment using existing owner-store CAS. 98 focused
 tests pass, 0 fail; no live integration. CC-006 is committed as `7ca248e4`.

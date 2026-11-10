@@ -48,3 +48,22 @@ After stopping the original worker, explicit `abandon --run-id ID
 through the existing mailbox writer, preserving the successful checkpoint.
 It never replays mail inspection or observation persistence. A fresh sync is a
 separate invocation. See [CC-007](../../docs/career-central/tasks/CC-007.md).
+
+## First-live preparation (CC-008)
+
+The session-only path now signs in and inspects within the same `first-sync`
+process; no persistent-vault prerequisite is needed for that path. See the
+[runbook](../../docs/OUTLOOK.md) for one-hour/10-message acceptance and optional
+native Windows setup. The protected factory precreates its cache owner-only,
+refuses unsafe existing aliases/permissions and vendor scratch files, and
+serializes cooperating validation in one directory. Native Windows uses explicit
+DACL checks for owner and current-user/SYSTEM-only allow rules, rather than
+POSIX mode assumptions. These checks do not defeat malicious same-user races or
+administrators with takeover privileges, and their native acceptance is unrun.
+
+`outlook-vault-test.mjs` uses isolated synthetic labels and a separate subdirectory
+for save/restart/verify/delete. It does not open real OAuth config or caches.
+A round-trip does not certify power-loss/interrupted-write durability or cross-user
+isolation. Linux still requires real Secret Service and native bindings; there
+is no plaintext or WSL-to-Windows DPAPI fallback. MSAL account removal now uses
+`removeAccount` with persistence callbacks; it does not revoke remote consent.

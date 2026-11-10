@@ -1,5 +1,36 @@
 # Latest handoff
 
+## Controlled personal Outlook first-sync — 2026-11-10
+
+See [CC-008](tasks/CC-008.md) and the rewritten [Outlook runbook](../OUTLOOK.md).
+Initial Git verification: HEAD `a97b6249`, clean tree, both previous commits
+completed. New code wires `first-sync --hours 1` through normal Microsoft
+sign-in, the existing Graph adapter/analyzer/coordinator and owner writers in
+one process. Default session-only credentials now work for a complete invocation;
+tokens are not serialized. Every CLI read is capped at 24 hours, one page and
+10 metadata messages, with at most 10 matched detail reads. No auto pagination,
+status transition, code use, submission or retry. Output contains bounded counts.
+
+Fixed missing lock options, unsupported MSAL cache clearing, scope/account
+rejection, initial protected-file permissions, native Windows ACL checks and
+provider-window/duplicate/detail validation. Added an isolated synthetic native
+vault test for user execution. 223 offline tests pass, 0 fail, 0 skip (three
+browser cases explicitly excluded). The task lists exact acceptance commands.
+
+Preflight confirms WSL lacks a loadable native extension, acquired Secret Service
+and LibSecret build metadata. Native Windows Node exists; actual DPAPI/ACL and
+restart/interruption/cross-user acceptance remains unrun. Recommended immediate
+path: user-run session-only WSL first read after a personal-account public-client
+registration and Microsoft consent. Windows protected persistence remains opt-in
+and requires documented setup/testing; it uses a separate explicit data root.
+
+Next requires user participation: app registration/client ID, Microsoft sign-in
+and consent, localhost callback, optional native vault setup. No account/config,
+cache contents or mailbox were accessed during development. No package install,
+cloud provisioning, submission, remote push or autonomous behavior occurred.
+Do not claim live acceptance from mock tests. Earlier handoff entries below are
+historical; they describe their original checkpoints and authorization scope.
+
 ## Interrupted sync reconciliation — 2026-11-10
 
 Readiness and bounded sync are committed at `7ca248e4` (local only; no push).

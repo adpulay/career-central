@@ -4,3 +4,7 @@ M3C is complete locally as of 2026-11-06. The existing [STATUS.md](STATUS.md) re
 
 Local readiness and bounded sync preparation were added on 2026-11-10; see
 [CC-006](tasks/CC-006.md) and the latest handoff. Live M3D acceptance remains unrun.
+
+[CC-008](tasks/CC-008.md) adds a controlled same-process session-only first-sync
+command and native storage fixes. 223 offline checks pass; live/native acceptance
+still requires user participation described in [OUTLOOK](../OUTLOOK.md).
