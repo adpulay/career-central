@@ -1,5 +1,22 @@
 # Latest handoff
 
+## Send callback connection-refused follow-up — 2026-11-10
+
+User's bounded reply-context command completed successfully with one body read
+and context_ready/incomplete=false. This is user-supplied live context acceptance;
+no agent mailbox request. The subsequent send browser callback reported localhost
+connection refused while the user recalls the terminal waiting. No Gmail auth
+process remained at inspection. Exact cause remains unconfirmed; do not assume
+timeout or silently resend. A new synthetic Windows-to-WSL probe passed locally
+and from Windows, without OAuth or private configuration access.
+
+Added -d/--diagnostics to the separate send CLI using the existing sanitized
+OAuth reporter, plus explicit fresh-URL/five-minute instructions. No binding,
+PKCE/state/scope, lifetime, duplicate or approval protections were changed.
+43 focused send/reply/OAuth tests pass. Next is a user-controlled fresh
+`npm run gmail:send -- --test-reply -d`, exact preview/SEND and current Google URL;
+same-thread send acceptance remains pending. Share diagnostics, never URLs/codes.
+
 ## Bounded reply context and personal writing guide — 2026-11-10
 
 User reports the first reviewed send reached the original mailbox (in Junk).

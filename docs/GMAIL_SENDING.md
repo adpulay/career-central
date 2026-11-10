@@ -116,6 +116,17 @@ References: [Google scopes](https://developers.google.com/workspace/gmail/api/au
 
 ## Bounded incoming reply review
 
+If the browser reports `127.0.0.1 refused to connect`, retry with
+`npm run gmail:send -- --test-reply -d` after cancelling any old terminal attempt.
+Approve the preview and open only the newly printed Google authorization URL,
+keeping the terminal active and completing consent within five minutes. Never
+reuse a previous callback URL or edit its query parameters. Diagnostics contain
+only safe listener/authentication stages; share final JSON or diagnostic lines,
+never authorization/callback URLs or codes. A synthetic forwarding probe can be
+run with `node scripts/gmail-loopback-check.mjs`; it performs no OAuth/mail access.
+A passing probe does not prove that a particular browser callback reached its
+matching listener.
+
 User-operated sending and recipient delivery were reported successful; the test
 landed in Junk. This does not establish deliverability to other recipients.
 

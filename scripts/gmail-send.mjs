@@ -18,7 +18,7 @@ import {sanitizeOAuthDiagnostic} from '../lib/email/oauth-diagnostics.mjs';
 const fail = code => Object.assign(Error(code), {code});
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 async function main() {
-  const {values} = parseArgs({options: {draft: {type: 'string'}, 'job-key': {type: 'string'}, 'test-reply': {type: 'boolean', default: false}, preview: {type: 'boolean', default: false}}});
+  const {values} = parseArgs({options: {draft: {type: 'string'}, 'job-key': {type: 'string'}, diagnostics: {type: 'boolean', short: 'd', default: false}, 'test-reply': {type: 'boolean', default: false}, preview: {type: 'boolean', default: false}}});
   const root = getCareerOpsRoot();
   const directory = privateDirectory(process.env.CAREER_OPS_GMAIL_AUTH_DIR || path.join(os.homedir(), '.local/state/career-ops/gmail'), repo);
   const config = readGmailConfiguration(path.join(directory, 'config.json'));
@@ -62,9 +62,10 @@ async function main() {
   let answer;
   try {answer = await terminal.question('Send this exact email? Type SEND to approve, or Enter to cancel: ');} finally {terminal.close();}
   if (answer !== 'SEND') {console.log('Cancelled. No connection or send attempted.'); return;}
-  const auth = createGmailAuth({...loadGoogleDesktopClient(config.clientFile, {repo}), purpose: 'reviewed-send'});
+  const auth = createGmailAuth({...loadGoogleDesktopClient(config.clientFile, {repo}), purpose: 'reviewed-send',
+    onDiagnostic: values.diagnostics ? event => console.error(JSON.stringify({oauthDiagnostic: event})) : undefined});
   try {
-    await auth.connect(config.account, url => console.log('Open this Google URL locally; keep the terminal running:\n' + url),
+    await auth.connect(config.account, url => console.log('Open this NEW Google URL locally now; keep this terminal running. Older attempt URLs will not work.\nThe callback listener waits up to 5 minutes:\n' + url),
       {authorizeConnection: true, authorizeSending: true});
     const result = await sendReviewedMail({root, review, approvedDigest: review.digest, account: config.account, recipients,
       getToken: () => auth.token(config.account), authorizeSending: true});

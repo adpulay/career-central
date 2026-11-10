@@ -123,8 +123,9 @@ test('offline CLI preview needs no client credentials; noninteractive send fails
     accountId: 'gmail_' + 'a'.repeat(32), clientFile: '/nonexistent/client.json', rules: [], automaticCodeUse: false, automaticStatusChanges: false};
   fs.writeFileSync(path.join(directory, 'config.json'), JSON.stringify(config), {mode: 0o600});
   const env = {...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_GMAIL_AUTH_DIR: directory};
-  const preview = spawnSync(process.execPath, ['scripts/gmail-send.mjs', '--preview'], {env, encoding: 'utf8'});
+  const preview = spawnSync(process.execPath, ['scripts/gmail-send.mjs', '--preview', '-d'], {env, encoding: 'utf8'});
   assert.equal(preview.status, 0, preview.stderr); assert.match(preview.stdout, /Preview only/); assert.match(preview.stdout, /Career Ops TEST/);
+  assert.equal(preview.stderr, '');
   const send = spawnSync(process.execPath, ['scripts/gmail-send.mjs'], {env, encoding: 'utf8'});
   assert.equal(send.status, 1); assert.match(send.stderr, /GMAIL_INTERACTIVE_REVIEW_REQUIRED/);
   assert.equal(fs.existsSync(path.join(root, 'data/application-automation/ledger.json')), false);
