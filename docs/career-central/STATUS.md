@@ -1,5 +1,31 @@
 # Verified project state
 
+## Local monitoring-storage migration applied — 2026-11-11
+
+Applied with the user's approval: `npm run monitor -- migrate-store --apply` at 2026-11-11T00:42:24Z, from commit `9e7622c6`.
+
+Pre-flight:
+- Clean tree.
+- The backup `data/backups/job-monitor-premigration-20261111T003329Z/` matched the live ledger SHA-256 (`fa427de7…`), re-verified immediately before applying.
+- No leases, locks, recurring authorization or OS scheduler entries. No process held ledger or monitor files open; leftover PDF-server processes don't reference the ledger.
+
+Result:
+- 3 per-employer partitions: Cloudflare 491, Datadog 421 and MongoDB 395 postings (1,307 total), plus an index recording the legacy content hash.
+- Ledger 3,610,459 → 242,200 bytes (−93.3%).
+- Files are 0600 and directories 0700.
+
+Validation (26/26 checks):
+- Monitor content canonically identical.
+- Every first-seen timestamp and all three live-feed checkpoints identical.
+- No cross-source postings; alerts, proposals and decisions preserved.
+- Ledger keeps only `schemaVersion, jobs, events, gmailMailboxHealth, emailInbox, reviewedMailSends`, each identical (56 jobs, 204 events).
+- Dashboard read model and health identical (27 needs-review; scheduler `not_authorized`; all sources `ok_no_changes`).
+- CV, profile, tracker and discovery cache unchanged.
+- 408 related regressions passed.
+- A read-only production dashboard check on the real data (375/1440px) showed 27 cards, with no writes, no external requests, no errors and no byte changes.
+
+Recovery remains available: a `rollback-store` dry run reports the full state; the backup is intact.
+
 ## Migration readiness, scheduler validation, coverage review, cloud plan — 2026-11-11
 
 **Monitoring storage migration: validated, backed up, awaiting approval (not applied).**

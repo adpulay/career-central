@@ -1,5 +1,18 @@
 # Latest handoff
 
+## Monitoring storage migrated locally — 2026-11-11
+
+The real monitor state now lives in `data/job-monitor/` (per-employer partitions); polls no longer rewrite the application ledger. Results and validation evidence are in [STATUS](STATUS.md). Recovery: `npm run monitor -- rollback-store --apply` (keeps any newer state); fallback is the backup at `data/backups/job-monitor-premigration-20261111T003329Z/` per its manifest.
+
+Remaining blockers (approvals):
+- recurring activation (sources, intervals, authorization length, one OS trigger);
+- the proposed employer set, each starting with one `first-poll`;
+- "never applied" confirmations in the private profile;
+- the cloud-plan §15 decisions;
+- review of the career-ops v1.40.0 release notes before updating.
+
+Next milestone: [CC-017](tasks/CC-017.md) C0, local cloud-readiness on top of the migrated store. Optionally run in parallel: a controlled local activation for one or two approved sources.
+
 ## Ready for approvals: migration, monitor activation, employer set, cloud C0 — 2026-11-11
 
 - **Migration:** validated and backed up; awaiting approval of `migrate-store --apply` (exact operation, backup and rollback in [STATUS](STATUS.md)).
