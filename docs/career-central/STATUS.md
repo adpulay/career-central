@@ -1,5 +1,15 @@
 # Verified project state
 
+## Role classification and start-date state — 2026-11-11
+
+- **Role classification:** business-function titles (now including business operations, strategy & operations, procurement and supply chain) are excluded only when the title has no engineering function noun (engineer, developer, SRE, DevOps, architect, administrator). "Infrastructure Business Operations Associate" is excluded; cloud, platform, DevOps, backend and SRE engineering titles, and engineering roles in business domains ("Software Engineer, Finance Platform"), still pass. The previous rule would have wrongly excluded that last kind of title.
+- **Start dates:** the employer side and the candidate side are separate. An unstated, month-less or internship employer start is `Employer start date unconfirmed` (`match.startDate`: `employer_unspecified`, `employer_month_unparsed` or `internship_not_compared`). Missing or provisional verified availability is a separate candidate-side unknown, and a stated start before verified availability is still an exclusion.
+- **`potentially_eligible` state:** used only when the employer start date is the sole open item. These postings rank between qualified and needs-review, can be high priority, alert and receive a local preparation proposal, and show "Potentially eligible — start date unconfirmed" on the dashboard. `match.submissionReady` is always false: the monitor never grants submission readiness. `submissionBlockers` lists every open item, and submission gates remain in the application workflow, which doesn't read monitor status.
+
+Real-data offline re-evaluation: the Business Operations posting is now excluded, leaving a 27-posting review list. None are potentially eligible: all 27 also lack an explicit graduation window and an explicit entry-level title, so the state applies only to future clearly new-grad postings. Protected-state fingerprints are unchanged.
+
+Validation: 393 related Node regressions passed with zero failures or skips (52 monitor cases). Typecheck/build and the job-monitor (now including a potentially-eligible label case), job-monitor-cache and career-central browser suites passed. A read-only real-data dashboard check at 375/1440px found 27 cards, the expected labels and no writes, external requests or errors.
+
 ## Eligibility classification and evidence fixes — 2026-11-10
 
 Monitor eligibility now:

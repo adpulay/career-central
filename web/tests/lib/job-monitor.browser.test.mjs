@@ -12,7 +12,7 @@ test('monitor dashboard renders end-to-end results and persists decisions withou
   const read = () => JSON.parse(fs.readFileSync(file)), before = read();
   const response = await fetch(new URL('/api/career-central/monitor', base));
   assert.equal(response.status, 200); assert.match(response.headers.get('cache-control'), /private, no-store/);
-  const view = await response.json(); assert.equal(view.jobs.length, 1); assert.equal(view.alerts.length, 1); assert.equal(view.tasks.length, 1);
+  const view = await response.json(); assert.equal(view.jobs.length, 2); assert.equal(view.alerts.length, 1, 'baseline posting stays quiet'); assert.equal(view.tasks.length, 1);
   assert.equal((await fetch(new URL('/api/career-central/monitor', base), {method: 'POST', headers: {'Content-Type': 'application/json', Origin: 'https://example.invalid', 'Sec-Fetch-Site': 'cross-site'}, body: '{}'})).status, 403);
   assert.equal((await fetch(new URL('/api/career-central/monitor', base), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({postingId: 'x'.repeat(3000)})})).status, 413);
   assert.equal((await fetch(new URL('/api/career-central/monitor', base), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({source: 'x', authorizeLiveRead: true})})).status, 400);
@@ -26,12 +26,15 @@ test('monitor dashboard renders end-to-end results and persists decisions withou
     await page.getByRole('heading', {name: 'Job shortlist and posting monitor', exact: true}).waitFor();
     await page.getByRole('combobox', {name: 'Decision for Software Engineer I, New Grad 2027'}).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    assert.deepEqual(await page.getByTestId('monitor-match-status').allInnerTexts(), ['Qualified', 'Potentially eligible — start date unconfirmed']);
+    assert.equal(await page.getByTestId('monitor-start-unconfirmed').count(), 1);
+    assert.equal(await page.getByTestId('monitor-eligibility-review').count(), 0, 'start-only gap is not shown as incomplete eligibility');
   }
   const select = page.getByRole('combobox', {name: 'Decision for Software Engineer I, New Grad 2027'});
   for (const decision of ['interested', 'dismissed', 'awaiting_application']) {
     await select.selectOption(decision);
     await page.waitForFunction(value => (document.querySelector('select[aria-label^="Decision for"]')).value === value && !document.querySelector('select[aria-label^="Decision for"]').disabled, decision);
-    assert.equal(Object.values(read().jobMonitor.postings)[0].decision, decision);
+    assert.equal(Object.values(read().jobMonitor.postings).find(row => row.postingId === '101').decision, decision);
   }
   await page.reload(); assert.equal(await select.inputValue(), 'awaiting_application');
   await page.getByRole('button', {name: 'Dismiss alert', exact: true}).click();

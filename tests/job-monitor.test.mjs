@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
-import {configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval, graduationWindow, reevaluatePostings} from '../lib/career-central/job-monitor.mjs';
+import {configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval, graduationWindow, reevaluatePostings, START_UNCONFIRMED} from '../lib/career-central/job-monitor.mjs';
 import {createFeedReader} from '../lib/career-central/monitor-feed.mjs';
 import {updateLedger} from '../lib/applications/store.mjs';
 const now = Date.parse('2026-11-10T12:00:00Z'), step = 360000;
@@ -156,7 +156,9 @@ test('status/unauthorized CLI are offline and do not initialize a missing data r
 }));
 test('unknown external history or employer start blocks readiness; graduation ranges do not falsely exclude', () => {
   assert.equal(evaluateMonitoredJob(job(), {...context, profile: {...profile, employerApplicationHistory: {}}}).status, 'needs_review');
-  assert.equal(evaluateMonitoredJob(job('1', {description: 'Graduating in 2027. AWS Docker'}), context).status, 'needs_review');
+  const noStart = evaluateMonitoredJob(job('1', {description: 'Graduating in 2027. AWS Docker'}), context);
+  assert.equal(noStart.status, 'potentially_eligible'); assert.equal(noStart.submissionReady, false);
+  assert.ok(noStart.submissionBlockers.includes(START_UNCONFIRMED));
   const result = evaluateMonitoredJob(job('1', {description: 'Graduating between December 2026 and May 2027. Starting in June 2027. AWS Docker Python Linux SQL.'}), context);
   assert.notEqual(result.status, 'excluded');
 });
@@ -344,7 +346,7 @@ test('issue 5: a posting graduation window that starts after the saved graduatio
   assert.equal(graduationWindow('Graduation date in Fall 2027.', null), null, 'unverified graduation cannot decide');
 });
 test('issue 6: unspecified, month-less or internship employer start dates remain unresolved', () => {
-  const start = 'Employer start or verified availability requires review', base = 'Required: graduating in 2027. Build AWS Docker Python Linux SQL applications.';
+  const start = START_UNCONFIRMED, base = 'Required: graduating in 2027. Build AWS Docker Python Linux SQL applications.';
   for (const description of [base, base + ' Start date: Summer 2027.', base + ' Starting in 2027.', base + ' Start date: flexible.', base + ' Starting in May or June 2027.']) {
     const result = evaluate({description}); assert.ok(result.unknowns.includes(start), description); assert.ok(!result.exclusions.includes('Explicit start precedes verified availability'), description);
   }
@@ -352,7 +354,8 @@ test('issue 6: unspecified, month-less or internship employer start dates remain
   assert.ok(intern.unknowns.includes(start)); assert.ok(!intern.exclusions.includes('Explicit start precedes verified availability'), 'full-time availability does not govern an internship');
   assert.ok(!evaluate({description: base + ' Starting in June 2027.'}).unknowns.includes(start));
   assert.ok(evaluate({description: base + ' Starting in May 2027.'}).exclusions.includes('Explicit start precedes verified availability'));
-  assert.ok(evaluate({description: base + ' Starting in June 2027.'}, withProfile({standardAnswers: {full_time_start: {value: '2027-06', verified: true, provisional: true}}})).unknowns.includes(start));
+  const provisional = evaluate({description: base + ' Starting in June 2027.'}, withProfile({standardAnswers: {full_time_start: {value: '2027-06', verified: true, provisional: true}}}));
+  assert.ok(provisional.unknowns.includes('Verified availability unavailable or provisional')); assert.equal(provisional.status, 'needs_review', 'a candidate-side gap is not start-only');
 });
 test('issue 6: same-month start equals availability in every timezone', () => {
   const script = `import {evaluateMonitoredJob} from './lib/career-central/job-monitor.mjs';
@@ -400,3 +403,35 @@ test('issue 1: negation is scoped to the skill mention, not a long run-on requir
   assert.ok(evaluate({description: job().description + ' ' + block}).unknowns.includes('Required technical skill evidence needs review'));
   assert.ok(!evaluate({description: job().description + ' Required: production-quality code in Go (or other languages with a willingness to learn Go).'}).unknowns.includes('Required technical skill evidence needs review'));
 });
+
+test('role classification: business-operations titles fail; engineering titles in business domains pass', () => {
+  for (const title of ['Infrastructure Business Operations Associate', 'Business Operations Analyst, Cloud', 'Strategy & Operations Associate, Platform', 'Cloud Procurement Associate', 'Cloud Sales Associate'])
+    assert.ok(evaluate({title}).exclusions.includes('Title indicates non-technical business function'), title);
+  for (const title of ['Cloud Infrastructure Engineer I', 'Platform Engineer I', 'DevOps Engineer I', 'Backend Software Engineer I', 'Site Reliability Engineer I',
+    'Software Engineer I, Finance Platform', 'Infrastructure Engineer I, Business Systems', 'Software Engineer I, Supply Chain Platform', 'Associate Sales Engineer, Cloud Platform']) {
+    const result = evaluate({title});
+    assert.ok(!result.exclusions.includes('Title indicates non-technical business function'), title);
+    assert.ok(!result.exclusions.includes('Title outside configured technical role families'), title);
+  }
+});
+test('start-date-only gap is potentially eligible, ranks above review, alerts and proposes preparation, but never submission-ready', () => fixture(async root => {
+  const startOnly = evaluate({description: 'Required: graduating in 2027. Build AWS Docker Python Linux SQL applications.'});
+  assert.equal(startOnly.status, 'potentially_eligible'); assert.equal(startOnly.startDate, 'employer_unspecified');
+  assert.deepEqual(startOnly.unknowns, [START_UNCONFIRMED]); assert.deepEqual(startOnly.submissionBlockers, [START_UNCONFIRMED]);
+  assert.equal(startOnly.submissionReady, false); assert.equal(startOnly.highPriority, true);
+  // Distinct from explicit ineligibility and from other open items.
+  assert.equal(evaluate({description: 'Required: graduating in 2027. Starting in May 2027. AWS Docker Python Linux SQL.'}).status, 'excluded');
+  assert.equal(evaluate({title: 'Software Engineer', description: 'Required: graduating in 2027. AWS Docker Python Linux SQL.'}).status, 'needs_review');
+  const full = evaluate(); assert.equal(full.status, 'qualified'); assert.equal(full.startDate, 'compatible'); assert.equal(full.submissionReady, false, 'monitor never grants submission readiness');
+  await configureSources(root, [source]); await poll(root, []);
+  const noStart = {description: 'Required: graduating in 2027. Build AWS Docker Python Linux SQL applications. No professional experience required.'};
+  const result = await poll(root, [job('201', noStart), job('202', {title: 'Software Engineer', ...noStart})], now + step);
+  assert.equal(result.alerts, 2); assert.equal(result.preparationTasks, 1);
+  const view = monitorView(root);
+  assert.deepEqual(view.jobs.map(row => row.match.status), ['potentially_eligible', 'needs_review']);
+  assert.equal(view.counts.potentiallyEligible, 1);
+  assert.ok(view.tasks[0].missing.includes(START_UNCONFIRMED)); assert.ok(view.tasks[0].approvals.includes('Final submission approval'));
+  assert.equal(view.submittedApplications, 0);
+  // Duplicate alert prevention holds for the new state.
+  assert.equal((await poll(root, [job('201', noStart), job('202', {title: 'Software Engineer', ...noStart})], now + step * 2)).alerts, 0);
+}));

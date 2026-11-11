@@ -1,5 +1,9 @@
 # Latest handoff
 
+## Role classification and potentially-eligible start state — 2026-11-11
+
+Fixed "Infrastructure Business Operations Associate" passing the technical filter: `infrastructure` matched the role family and nothing caught the business function. The non-technical rule now excludes a business-function title only when it has no engineering noun. Unstated employer start dates stay unresolved but are no longer conflated with candidate-side gaps or ineligibility. A posting whose only gap is the employer start date becomes `potentially_eligible`: it is shortlisted first after qualified postings and can alert and receive a preparation proposal, but it is never submission-ready. Details and validation are in [STATUS](STATUS.md). The current 27-posting shortlist has no start-only cases.
+
 ## Eligibility classification and cached-evidence fixes — 2026-11-10
 
 State at start: the interrupted session had left uncommitted, passing hardening for the first live baseline after cache seeding: `first-poll`, pause/resume CLI, a dashboard cache warning and a cache browser suite. Saved sources already had live-feed checkpoints. This was validated and committed separately before the eligibility fixes. No eligibility code had been started.
