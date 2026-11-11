@@ -67,6 +67,7 @@ The scheduler is a single tick command for an external trigger. No cron, systemd
 npm run monitor -- health                       # scheduler + per-source operational state (read-only)
 npm run monitor -- migrate-store                # dry run: partition sizes and lossless round-trip check
 npm run monitor -- migrate-store --apply        # move monitor state out of the application ledger
+npm run monitor -- rollback-store [--apply]     # verified reverse: fold the split store back into the ledger
 npm run monitor -- authorize-recurring --source cloudflare,datadog --hours 72 --max-polls 3
 npm run monitor -- tick --authorize-live-read   # one pass; what the external trigger would run
 npm run monitor -- revoke-recurring             # emergency stop for recurring polls
@@ -79,6 +80,8 @@ npm run monitor -- revoke-recurring             # emergency stop for recurring p
   - Per source: `ok_no_changes` (healthy, nothing new), `ok_changes`, `failing`, `rate_limited`, `overdue` (authorized and past due plus a grace of twice the interval, minimum 10 minutes), `polling`, `worker_lost` (expired lease, reclaimed on the next tick), `paused`, `never_polled`, `cached_only`.
   - Scheduler: `not_authorized`, `authorization_expired`, `authorized_never_ran`, `running`, `running_with_failures`, `stale` (no tick within twice the shortest interval, minimum 10 minutes).
   - A preparation proposal awaiting review is monitor state; failed or awaiting-approval applications remain application-workflow states.
+
+Rollback keeps state recorded after migration; a restored pre-migration backup (`data/backups/job-monitor-premigration-*`, with `manifest.json` holding the hashes) is the fallback when the split store is unreadable. Both directions resume after an interruption only when the two copies are identical, and otherwise fail closed. A simulated 8-hour scheduler scenario (per-employer intervals, crash reclaim, outage backoff, Retry-After, pause/resume, expiry, quiet baselines, one alert per version) is in `tests/job-monitor-scheduler.test.mjs`.
 
 Activation checklist (each step needs the user's explicit approval): apply the store migration; run one `first-poll` per source; choose sources, interval (15 minutes or more until a source's policy and budget support less), authorization duration and polls per tick; install one OS trigger at about the shortest interval; check `health` after the first ticks; revoke and remove the trigger to stop.
 

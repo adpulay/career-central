@@ -436,3 +436,27 @@ test('start-date-only gap is potentially eligible, ranks above review, alerts an
   // Duplicate alert prevention holds for the new state.
   assert.equal((await poll(root, [job('201', noStart), job('202', {title: 'Software Engineer', ...noStart})], now + step * 2)).alerts, 0);
 }));
+
+test('false exclusions found in employer coverage review: graduation ranges, benefit dates, clearance eligibility', () => {
+  const graduationTitle = 'Software Engineer I, Entry-Level';
+  for (const phrase of ['Graduation Date: Fall 2026-Summer 2027', 'graduating between Fall 2026 and Summer 2027', 'Graduation date: Fall 2026 to Summer 2027', 'Graduation date: Fall 2026 – Summer 2027']) {
+    const window = graduationWindow(phrase + '.', '2027-05');
+    assert.equal(window.inside, true, phrase);
+    assert.ok(!evaluate({title: graduationTitle, description: `Required: ${phrase}. AWS Docker Python Linux SQL.`}).exclusions.some(value => /graduation window/.test(value)), phrase);
+  }
+  assert.equal(graduationWindow('Graduation date in Fall 2027, Spring 2028 or Summer 2028.', '2027-05').inside, false, 'lists remain discrete');
+  assert.equal(graduationWindow('Graduating in Spring 2026 and Fall 2027.', '2027-05').inside, false, '"and" without "between" is a list');
+  const benefit = evaluate({description: 'Required: graduating in 2027. AWS Docker Python Linux SQL. Starting January 2027, the company will match a portion of 401(k) contributions.'});
+  assert.ok(!benefit.exclusions.includes('Explicit start precedes verified availability')); assert.equal(benefit.startDate, 'employer_unspecified');
+  assert.ok(evaluate({description: 'Required: graduating in 2027. AWS Docker Python Linux SQL. Start date: January 2027.'}).exclusions.includes('Explicit start precedes verified availability'));
+  const eligible = evaluate({description: job().description + ' Active US Security clearance, or eligibility and willingness to obtain a US Security clearance.'});
+  assert.ok(!eligible.exclusions.some(value => /clearance/i.test(value))); assert.ok(eligible.unknowns.includes('Security clearance eligibility requires review'));
+  for (const text of ['Active Full Scope Poly level US security clearance.', 'Must hold an active TS/SCI clearance.'])
+    assert.ok(evaluate({description: job().description + ' ' + text}).exclusions.includes('Active clearance requirement; verify quoted requirement'), text);
+});
+
+test('early-career and university-graduate titles count as entry level, matching the shared evaluator', () => {
+  for (const title of ['[2027] Software Engineer, Early Career', 'Backend Software Engineer - University Graduate 2027', 'Software Engineer, Early Career (NYC)'])
+    assert.ok(!evaluate({title}).unknowns.includes('Entry-level seniority requires review'), title);
+  assert.ok(evaluate({title: 'Software Engineer'}).unknowns.includes('Entry-level seniority requires review'));
+});

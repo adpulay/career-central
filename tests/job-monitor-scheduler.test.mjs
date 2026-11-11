@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {configureSources, pollSource, readMonitor, monitorView, setMonitorDecision} from '../lib/career-central/job-monitor.mjs';
-import {monitorBackend, migrateMonitorStore, updateMonitor} from '../lib/career-central/monitor-store.mjs';
+import {monitorBackend, migrateMonitorStore, rollbackMonitorStore, updateMonitor} from '../lib/career-central/monitor-store.mjs';
 import {authorizeRecurring, revokeRecurring, runMonitorTick, monitorHealth} from '../lib/career-central/monitor-scheduler.mjs';
 import {updateLedger} from '../lib/applications/store.mjs';
 
@@ -184,4 +184,118 @@ test('CLI: tick needs live consent; migrate-store defaults to a dry run; health 
   const denied = run('tick'); assert.equal(denied.status, 1); assert.match(denied.stderr, /MONITOR_LIVE_NOT_AUTHORIZED/);
   const health = run('health'); assert.equal(health.status, 0, health.stderr); assert.equal(JSON.parse(health.stdout).scheduler, 'not_authorized');
   const migrate = run('migrate-store'); assert.equal(migrate.status, 0, migrate.stderr); assert.equal(JSON.parse(migrate.stdout).reason, 'already_migrated');
+}));
+
+test('rollback folds the split store back into the ledger, keeping post-migration state, and is resumable', () => fixture(async root => {
+  await seedLedger(root);
+  await updateLedger(root, ledger => {ledger.jobMonitor = {schemaVersion: 1, sources: {}, postings: {}, alerts: {}, preparationTasks: {}, revision: 0};});
+  await configureSources(root, [src('alpha')]);
+  await pollSource({root, sourceId: 'alpha', context, now, random: () => 0, fetchSnapshot: feeds({alpha: []})});
+  const ledgerOther = () => {const {jobMonitor, ...rest} = JSON.parse(fs.readFileSync(ledgerFile(root))); return rest;}, otherBefore = ledgerOther();
+  await migrateMonitorStore(root, {dryRun: false});
+  // State recorded after migration must survive rollback (a backup restore would lose it).
+  await pollSource({root, sourceId: 'alpha', context, now: now + 20 * minute, random: () => 0, fetchSnapshot: feeds({alpha: [job('alpha', '1')]})});
+  const {migration, ...expected} = readMonitor(root);
+  const dry = await rollbackMonitorStore(root);
+  assert.equal(dry.dryRun, true); assert.equal(dry.alerts, 1); assert.equal(monitorBackend(root), 'split');
+  await updateMonitor(root, monitor => {monitor.sources.alpha.lease = {token: 'live', until: now + 10 ** 12};});
+  await assert.rejects(rollbackMonitorStore(root, {dryRun: false}), {code: 'MONITOR_SOURCE_BUSY'});
+  await updateMonitor(root, monitor => {monitor.sources.alpha.lease = null;}); expected.sources.alpha.lease = null;
+  const done = await rollbackMonitorStore(root, {dryRun: false});
+  assert.equal(done.rolledBack, true); assert.equal(monitorBackend(root), 'legacy'); assert.equal(fs.existsSync(path.join(root, 'data/job-monitor')), false);
+  assert.deepEqual(readMonitor(root), {...expected, revision: readMonitor(root).revision});
+  assert.deepEqual(ledgerOther(), otherBefore, 'application/email ledger fields unchanged through migrate + rollback');
+  // Interrupted rollback: both identical copies exist; rerunning completes it.
+  await migrateMonitorStore(root, {dryRun: false});
+  const split = (({migration, ...rest}) => rest)(readMonitor(root));
+  await updateLedger(root, ledger => {ledger.jobMonitor = split;});
+  assert.throws(() => monitorBackend(root), {code: 'MONITOR_STORE_MIGRATION_INCOMPLETE'});
+  assert.equal((await rollbackMonitorStore(root, {dryRun: false})).resumed, true); assert.equal(monitorBackend(root), 'legacy');
+}));
+
+test('simulated 8-hour run: per-employer intervals, rate limits, backoff, crash recovery, pause, expiry and dedup', {timeout: 240000}, () => fixture(async root => {
+  // Three employers with distinct intervals; one tick per simulated minute.
+  await configureSources(root, [src('alpha', {intervalMinutes: 5}), src('bravo', {intervalMinutes: 15}), src('charlie', {intervalMinutes: 60})]);
+  await authorizeRecurring(root, {sourceIds: ['alpha', 'bravo', 'charlie'], hours: 6, now});
+  const feed = {alpha: [job('alpha', '1'), job('alpha', '2')], bravo: [job('bravo', '1')], charlie: [job('charlie', '1')]};
+  const pollsAt = {alpha: [], bravo: [], charlie: []}, failures = {};
+  let clock = now;
+  const fetchSnapshot = async definition => {
+    pollsAt[definition.id].push(clock);
+    const failure = failures[definition.id]?.(clock); if (failure) throw failure;
+    return {jobs: structuredClone(feed[definition.id]), complete: true};
+  };
+  const at = minutes => now + minutes * minute, alertsNow = () => Object.keys(readMonitor(root).alerts).length;
+  const run = async (from, to, hook = () => {}) => {for (let m = from; m < to; m++) {clock = at(m); await hook(m); await tick(root, fetchSnapshot, clock);}};
+
+  // Baselines are quiet, including across a "restart" (a fresh tick sequence on the same store).
+  await run(0, 2);
+  assert.equal(alertsNow(), 0, 'baseline postings never alert');
+  await run(2, 60);
+  assert.equal(alertsNow(), 0, 'unchanged feeds after restart never re-alert');
+
+  // Exactly one alert per new posting/version, despite many later ticks.
+  feed.alpha.push(job('alpha', '3'));
+  await run(60, 90);
+  assert.equal(alertsNow(), 1);
+  feed.alpha[2] = job('alpha', '3', {description: job('alpha', '3').description + ' Updated responsibilities.'});
+  await run(90, 120);
+  assert.equal(alertsNow(), 2, 'a content change is a new version, alerted once');
+
+  // Worker crash: a lease left behind blocks others until it expires, then is reclaimed.
+  await updateMonitor(root, monitor => {monitor.sources.bravo.lease = {token: 'crashed-worker', until: at(121) + 90000}; monitor.sources.bravo.nextDueAt = new Date(at(120)).toISOString();});
+  const bravoBefore = pollsAt.bravo.length;
+  await run(120, 122);
+  assert.equal(pollsAt.bravo.length, bravoBefore, 'live foreign lease is respected');
+  assert.equal(monitorHealth(readMonitor(root), at(123)).sources.bravo.state, 'worker_lost');
+  await run(122, 125);
+  assert.equal(pollsAt.bravo.length, bravoBefore + 1, 'expired lease reclaimed exactly once');
+  assert.equal(readMonitor(root).sources.bravo.lease, null);
+
+  // Provider outage: exponential backoff, then recovery resets failures.
+  failures.charlie = time => time < at(200) ? Object.assign(Error('down'), {status: 503}) : null;
+  await updateMonitor(root, monitor => {monitor.sources.charlie.nextDueAt = new Date(at(125)).toISOString();});
+  await run(125, 200);
+  const outage = pollsAt.charlie.filter(time => time >= at(125) && time < at(200));
+  assert.ok(outage.length >= 1 && outage.length <= 2, `backoff limits retries during the outage (${outage.length})`);
+  assert.equal(monitorHealth(readMonitor(root), at(200)).sources.charlie.state, 'failing');
+
+  // Rate limit: Retry-After (40 minutes) is honored beyond the 5-minute interval.
+  failures.alpha = time => time >= at(200) && time < at(203) ? Object.assign(Error('slow down'), {status: 429, retryAfter: '2400'}) : null;
+  await updateMonitor(root, monitor => {monitor.sources.alpha.nextDueAt = new Date(at(200)).toISOString();});
+  await run(200, 230);
+  const limitedAt = pollsAt.alpha.find(time => time >= at(200));
+  assert.equal(limitedAt, at(200), 'the 429 was actually received');
+  assert.ok(pollsAt.alpha.filter(time => time > limitedAt && time < limitedAt + 40 * minute).length === 0, 'no alpha poll inside Retry-After');
+  assert.equal(monitorHealth(readMonitor(root), at(230)).sources.alpha.state, 'rate_limited');
+
+  // Pause/resume: no polls while paused; polls resume when due.
+  await setMonitorDecision(root, {pausedSource: 'bravo', paused: true});
+  const pausedFrom = pollsAt.bravo.length;
+  await run(230, 280);
+  assert.equal(pollsAt.bravo.length, pausedFrom);
+  await setMonitorDecision(root, {pausedSource: 'bravo', paused: false});
+  await run(280, 300);
+  assert.ok(pollsAt.bravo.length > pausedFrom, 'resumed source polls again');
+
+  // Per-employer intervals act as rate limits: no source is ever polled faster than its interval
+  // (failed attempts back off further), and quiet sources stretch to at most 4x.
+  for (const [id, interval] of [['alpha', 5], ['bravo', 15], ['charlie', 60]]) {
+    // Ignore only gaps spanning a test-forced reschedule (crash, outage and 429 setups).
+    const forced = {alpha: [at(200)], bravo: [at(120)], charlie: [at(125)]}[id];
+    const times = pollsAt[id], gaps = times.slice(1).map((time, index) => ({gap: time - times[index], from: times[index], to: time}))
+      .filter(({from, to}) => !forced.some(mark => from < mark && to >= mark));
+    assert.ok(gaps.length >= 3, `${id} has scheduler-chosen gaps to check`);
+    assert.ok(gaps.every(({gap}) => gap >= interval * minute), `${id} never polled faster than ${interval} min`);
+  }
+  assert.ok(pollsAt.alpha.length > pollsAt.bravo.length && pollsAt.bravo.length > pollsAt.charlie.length, 'polling frequency follows employer intervals');
+
+  // Authorization expires at 6 hours: ticks stop, health reports it, no further polls.
+  const total = Object.values(pollsAt).flat().length;
+  await run(360, 370).catch(error => assert.equal(error.code, 'MONITOR_RECURRING_NOT_AUTHORIZED'));
+  await assert.rejects(tick(root, fetchSnapshot, at(361)), {code: 'MONITOR_RECURRING_NOT_AUTHORIZED'});
+  assert.equal(Object.values(pollsAt).flat().length, total);
+  assert.equal(monitorHealth(readMonitor(root), at(370)).scheduler, 'authorization_expired');
+  assert.equal(alertsNow(), 2, 'no duplicate alerts across the whole run');
+  assert.equal(monitorView(root, {now: at(370)}).submittedApplications, 0);
 }));

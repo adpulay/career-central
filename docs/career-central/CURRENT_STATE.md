@@ -1,5 +1,7 @@
 # Current state entry point
 
+Latest (2026-11-11): monitoring storage migration is validated and backed up, awaiting approval; the scheduler is validated by simulation; employer coverage reviewed ([EMPLOYER_COVERAGE](EMPLOYER_COVERAGE.md)); cloud plan proposed ([CLOUD_DEPLOYMENT_PLAN](CLOUD_DEPLOYMENT_PLAN.md), [CC-017](tasks/CC-017.md)). No recurring monitoring, cloud resource, email or application action is active.
+
 Current continuation: [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) minimum
 local shortlist/monitor workflow is implemented with synthetic and production-UI
 validation; cached observations seed the dashboard. [STATUS](STATUS.md) and

@@ -5,7 +5,7 @@ import {getCareerOpsRoot} from '../path-resolver.mjs';
 import {checkPath} from '../web/src/lib/core/operational-files.mjs';
 import {configureSources, pollSource, loadMatchingContext, monitorView, setMonitorDecision, seedCachedShortlist, reevaluatePostings, setMonitorInterval} from '../lib/career-central/job-monitor.mjs';
 import {createFeedReader} from '../lib/career-central/monitor-feed.mjs';
-import {migrateMonitorStore, readMonitorState} from '../lib/career-central/monitor-store.mjs';
+import {migrateMonitorStore, rollbackMonitorStore, readMonitorState} from '../lib/career-central/monitor-store.mjs';
 import {authorizeRecurring, revokeRecurring, runMonitorTick, monitorHealth} from '../lib/career-central/monitor-scheduler.mjs';
 const fail = code => Object.assign(Error(code), {code});
 const {values, positionals} = parseArgs({allowPositionals: true, options: {file: {type: 'string'}, source: {type: 'string'},
@@ -27,6 +27,7 @@ async function main() {
   if (command === 'health') return monitorHealth(readMonitorState(root));
   // Local storage migration: dry run unless --apply.
   if (command === 'migrate-store') return migrateMonitorStore(root, {dryRun: !values.apply});
+  if (command === 'rollback-store') return rollbackMonitorStore(root, {dryRun: !values.apply});
   // Persisted, expiring activation record; does not install any OS scheduler.
   if (command === 'authorize-recurring') return authorizeRecurring(root, {sourceIds: String(values.source || '').split(',').filter(Boolean),
     hours: Number(values.hours), maxPollsPerTick: values['max-polls'] === undefined ? 5 : Number(values['max-polls'])});

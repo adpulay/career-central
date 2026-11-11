@@ -1,5 +1,34 @@
 # Verified project state
 
+## Migration readiness, scheduler validation, coverage review, cloud plan — 2026-11-11
+
+**Monitoring storage migration: validated, backed up, awaiting approval (not applied).**
+
+- **Backup:** `data/backups/job-monitor-premigration-20261111T003329Z/` (current; it matches the live ledger SHA-256). An earlier 00:22Z backup predates an offline re-evaluation; first-seen timestamps, checkpoints and counts are identical between them. If any monitor command runs before the approved apply, take a fresh backup first. It contains a byte-exact copy of the ledger plus `manifest.json` (SHA-256, counts, checkpoints, first-seen digest). Permissions are 0700/0600 and the location is git-ignored.
+- **Real dry run:** 3 partitions (0.96/0.79/0.73 MB compact), 1,307 postings, 0 alerts/proposals; the ledger stayed byte-identical.
+- **Rehearsal on a disposable copy:** migrate then rollback. Monitor content, first-seen timestamps, checkpoints, the dashboard view and every application/email ledger field were identical in both directions. The copy was deleted.
+- **Operation to approve:** `npm run monitor -- migrate-store --apply`.
+- **Expected file changes:** `data/application-automation/ledger.json` is rewritten without its `jobMonitor` section (≈3.6 MB → ≈0.24 MB; jobs, events and email state unchanged). New files: `data/job-monitor/index.json` and `data/job-monitor/sources/{cloudflare,datadog,mongodb}.json`. A transient `data/job-monitor.lock`.
+- **Rollback:** `npm run monitor -- rollback-store --apply` (new). It folds the split store back into the ledger, verifies, then removes `data/job-monitor/`. Unlike a backup restore, it keeps state recorded after migration. Fallback: restore the backup ledger per its manifest.
+
+**Scheduler validation (offline, simulated clock):** a new 8-hour scenario checks:
+- per-employer intervals (5/15/60 minutes; no source ever polled faster than its interval);
+- respected foreign lease, then exactly one reclaim after expiry (crash recovery);
+- outage backoff limiting retries;
+- a 40-minute Retry-After honored over a 5-minute interval;
+- pause/resume;
+- authorization expiry stopping all polls;
+- quiet baselines across restart;
+- exactly one alert per posting version.
+
+Plus migration/rollback round trips, interruption resume in both directions, and conflict fail-closed checks.
+
+**Employer coverage:** see [EMPLOYER_COVERAGE](EMPLOYER_COVERAGE.md). The 1,242 live postings at the three monitored employers contain no full-time US new-grad engineering role. Projecting the evaluator onto other employers' cached new-grad postings exposed three false exclusions, now fixed with tests: graduation ranges, a benefits-date sentence read as a job start, and clearance "or eligibility to obtain". The monitor also now recognizes "Early Career" and "University Graduate" titles. The real 27-posting shortlist is unchanged (no qualifying postings at the current employers) and protected state is identical.
+
+**Cloud plan:** [CLOUD_DEPLOYMENT_PLAN](CLOUD_DEPLOYMENT_PLAN.md), [ADR 0003](decisions/0003-cloud-monitoring-first.md) (proposed), [CC-017](tasks/CC-017.md). Nothing provisioned.
+
+Validation: 408 related Node regressions passed, zero failures/skips (54 monitor and 12 scheduler/store cases). Typecheck/build and the job-monitor, job-monitor-cache and career-central browser suites passed. No live request, migration of real data, recurring authorization, OS trigger, email, application, push or cloud action.
+
 ## Recurring-monitoring readiness and local scheduler — 2026-11-11
 
 Readiness audit findings:

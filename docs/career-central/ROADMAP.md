@@ -40,6 +40,19 @@ P identifiers are new product milestones; they do not renumber historical M mile
 | P9 Configurable autonomous applications | Explicit allowlist/policy/caps and approved fact/document versions execute proven eligible cases with receipts, uncertainty stops, audit and emergency stop. | Repeated successful P2/P3 live acceptance, applicable P4 conformance, robust P1b queue/recovery, P5 approval binding and P6 controls. | Not authorized. Policy flags or this roadmap cannot enable autonomy; separate scoped pilot required. |
 | P10 Mobile PWA and hybrid AWS delivery | Accessible responsive journeys → private-safe install/offline/notifications → authenticated cloud dashboard/outbound worker → backup/recovery/cost acceptance. | Validated local workflows, ADR 0001 plus new auth/data-authority/transport decisions, budget/retention and operations plan. | No provisioning, paid dependency or public exposure now. PWA can precede cloud; cloud does not require autonomy. |
 
+## Cloud stage order (proposed 2026-11-11)
+
+[ADR 0003](decisions/0003-cloud-monitoring-first.md) proposes delivering P10 in stages, starting with unattended monitoring rather than a hosted dashboard:
+
+- **C0:** local cloud-readiness work.
+- **C1:** scheduled Lambda monitor on S3/DynamoDB.
+- **C2:** SQS fan-out.
+- **C3:** authenticated hosted dashboard.
+- **C4:** outbound browser worker.
+- **C5:** email, notifications and AI.
+
+See the [plan](CLOUD_DEPLOYMENT_PLAN.md), [CC-017](tasks/CC-017.md) and the [employer coverage review](EMPLOYER_COVERAGE.md). Nothing is provisioned; every stage needs its own approval.
+
 ## Dependency rationale and scope discipline
 
 The user's priority order is preserved, with continuous monitoring inserted immediately after the smallest reliable discovery slice. Bad matching multiplied by a fast poller creates noise and unsafe preparation; minimum identity/filter consistency must precede activation. A small approved-employer monitor should not wait for a general AI matching platform or every provider.

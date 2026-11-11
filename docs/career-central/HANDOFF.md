@@ -1,5 +1,25 @@
 # Latest handoff
 
+## Ready for approvals: migration, monitor activation, employer set, cloud C0 — 2026-11-11
+
+- **Migration:** validated and backed up; awaiting approval of `migrate-store --apply` (exact operation, backup and rollback in [STATUS](STATUS.md)).
+- **Scheduler:** offline-validated end to end with a simulated clock; not authorized or installed.
+- **Employers:** the current three have no US new-grad openings. The proposed monitor set is Databricks, Palantir, Stripe, Scale AI and Cloudflare, with a daily-scan tier ([EMPLOYER_COVERAGE](EMPLOYER_COVERAGE.md)). The user can unlock many new-employer postings by confirming "never applied" per employer in the private profile.
+- **Cloud:** run monitoring first on EventBridge Scheduler → Lambda, with S3 partition documents (`If-Match`) and DynamoDB control records; no SQS, VPC or secrets in C1. Estimated about $0.20–1/month for 5 employers, $3–12 for 100 (plus optional AI), $20–55 for 500.
+
+Blockers, all approvals:
+1. Local migration.
+2. Activation details (sources, intervals, duration, OS trigger).
+3. Adding new sources (`first-poll` each).
+4. AWS account, region and budget.
+5. CDK `infra/` workspace and dependencies.
+6. OIDC roles and protected environments.
+7. Cloud data allowlist and retention.
+
+The upstream career-ops v1.40.0 release notes are not yet reviewed against the customizations, so don't update until they are.
+
+Next milestone: [CC-017](tasks/CC-017.md) C0, local cloud-readiness (scoped store port with contract tests, unchanged-snapshot fast path, minimized eligibility projection, redacted telemetry, Lambda handler wrapper, dev fixture provider), together with the approved local migration and activation. C1 deployment follows only after the plan's §15 approvals.
+
 ## Recurring-monitoring readiness and local scheduler prepared — 2026-11-11
 
 Readiness gaps found and closed locally: monitor state shared the application ledger under one 3 MiB cap (a fourth employer would fail, and every poll rewrote application/email history), and there was no tick, activation record or health model. Added the split per-source store with a verified migration, a gated scheduler tick and distinct health states; see [STATUS](STATUS.md) and the [runbook](../JOB_MONITOR.md).

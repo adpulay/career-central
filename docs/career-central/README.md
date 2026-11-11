@@ -2,7 +2,7 @@
 
 Career Central extends Career Ops into a personal career workspace. Develop locally; target a hybrid AWS dashboard/data plane with outbound-only Windows/WSL automation workers. No deployment or new external application actions are authorized by the current milestone.
 
-Current continuation: [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) have a minimum implemented local shortlist → alert → preparation-proposal slice, existing-dashboard controls and offline cached seeding. See [monitor runbook](../JOB_MONITOR.md), [STATUS](STATUS.md) and [HANDOFF](HANDOFF.md). Live source acceptance/recurring activation remain pending. The broader [PRODUCT](PRODUCT.md), [inventory](FEATURE_INVENTORY.md) and [ROADMAP](ROADMAP.md) preserve incomplete product scope and all safety gates.
+Current continuation: the local monitor has a verified split store (real data not yet migrated; awaiting approval), a gated scheduler and health states. Cloud monitoring is planned in [CLOUD_DEPLOYMENT_PLAN](CLOUD_DEPLOYMENT_PLAN.md), [ADR 0003](decisions/0003-cloud-monitoring-first.md) and [CC-017](tasks/CC-017.md); employer recommendations are in [EMPLOYER_COVERAGE](EMPLOYER_COVERAGE.md). See [STATUS](STATUS.md) and [HANDOFF](HANDOFF.md). Nothing is provisioned or activated.
 
 Read in this order:
 
