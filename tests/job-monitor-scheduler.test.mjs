@@ -299,3 +299,31 @@ test('simulated 8-hour run: per-employer intervals, rate limits, backoff, crash 
   assert.equal(alertsNow(), 2, 'no duplicate alerts across the whole run');
   assert.equal(monitorView(root, {now: at(370)}).submittedApplications, 0);
 }));
+
+test('up to eight sources can stay configured while only authorized ones are polled', () => fixture(async root => {
+  const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
+  await configureSources(root, ids.slice(0, 3).map(id => src(id))); await configureSources(root, ids.slice(3).map(id => src(id)));
+  await configureSources(root, [src('a8')]);
+  await assert.rejects(configureSources(root, [src('a9')]), {code: 'MONITOR_SOURCE_INVALID'});
+  await authorizeRecurring(root, {sourceIds: ['a4', 'a5', 'a6', 'a7', 'a8'], hours: 168, now});
+  const calls = [];
+  const result = await tick(root, feeds({}, calls), now);
+  assert.equal(result.polled, 5); assert.deepEqual(calls.sort(), ['a4', 'a5', 'a6', 'a7', 'a8']);
+  const health = monitorHealth(readMonitor(root), now + 24 * 60 * minute);
+  assert.equal(health.sources.a1.recurring, false); assert.equal(health.sources.a1.state, 'never_polled', 'unauthorized sources are never polled or reported overdue');
+}));
+
+test('health: a failed first poll is failing (not never_polled), and a quiet baseline is not reported as changes', () => fixture(async root => {
+  await configureSources(root, [src('failedfirst'), src('limitedfirst'), src('baselined'), src('untouched')]);
+  const poll = (id, jobs, time) => pollSource({root, sourceId: id, context, now: time, random: () => 0, fetchSnapshot: feeds({[id]: jobs})});
+  await poll('failedfirst', Object.assign(Error('big'), {maxBytes: 1}), now);
+  await poll('limitedfirst', Object.assign(Error('slow'), {status: 429, retryAfter: '600'}), now);
+  await poll('baselined', [job('baselined', '1'), job('baselined', '2')], now);
+  const health = monitorHealth(readMonitor(root), now + minute);
+  assert.equal(health.sources.failedfirst.state, 'failing'); assert.equal(health.sources.failedfirst.errorCategory, 'response_too_large');
+  assert.equal(health.sources.limitedfirst.state, 'rate_limited');
+  assert.equal(health.sources.baselined.state, 'ok_no_changes');
+  assert.equal(health.sources.untouched.state, 'never_polled');
+  await poll('baselined', [job('baselined', '1'), job('baselined', '2'), job('baselined', '3')], now + 20 * minute);
+  assert.equal(monitorHealth(readMonitor(root), now + 21 * minute).sources.baselined.state, 'ok_changes');
+}));

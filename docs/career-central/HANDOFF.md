@@ -1,5 +1,18 @@
 # Latest handoff
 
+## Recurring-monitoring pilot ready for activation approval — 2026-11-11
+
+The five pilot sources are configured at 30 minutes, with Palantir and Scale AI baselined. Databricks and Stripe baselines are pending after a safe failure; the fixes are in. Eligibility, deduplication, scheduler recovery and the dashboard were verified (see [STATUS](STATUS.md)).
+
+The activation package (two pending `first-poll`s, a 168-hour authorization, and one Windows Task Scheduler trigger every 10 minutes running `scripts/job-monitor-tick.sh`), plus the pause, revoke and stop commands, is in the [runbook](../JOB_MONITOR.md#pilot-databricks-palantir-stripe-scale-ai-cloudflare-configured-2026-11-11-not-activated). **Nothing in it has been run.**
+
+Decisions for the user:
+1. Approve activation as written.
+2. Keep adaptive stretching on quiet feeds (up to 120 minutes) or pin 30 minutes.
+3. Record "never applied" answers for the pilot employers in the private profile. This is the main remaining blocker for potentially-eligible/high-priority status.
+
+Next milestone after a week of pilot observation: [CC-017](tasks/CC-017.md) C0.
+
 ## Monitoring storage migrated locally — 2026-11-11
 
 The real monitor state now lives in `data/job-monitor/` (per-employer partitions); polls no longer rewrite the application ledger. Results and validation evidence are in [STATUS](STATUS.md). Recovery: `npm run monitor -- rollback-store --apply` (keeps any newer state); fallback is the backup at `data/backups/job-monitor-premigration-20261111T003329Z/` per its manifest.

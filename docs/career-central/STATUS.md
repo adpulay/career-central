@@ -1,5 +1,29 @@
 # Verified project state
 
+## Local recurring-monitoring pilot configured (not activated) — 2026-11-11
+
+Configured Databricks (Greenhouse), Palantir (Lever), Stripe (Greenhouse) and Scale AI (Greenhouse) at 30 minutes, and moved Cloudflare to 30 minutes. Datadog and MongoDB stay configured, outside the pilot. The configured-source cap was raised from 5 to 8, since storage is per source. A pre-pilot backup is at `data/backups/job-monitor-prepilot-20261111T005246Z/` (SHA256SUMS verified).
+
+**Baselines:**
+- Palantir and Scale AI: established quietly by one bounded `first-poll` each (≤ 2 GETs): 304 and 169 postings, all `baseline`, 0 alerts and 0 proposals.
+- Databricks and Stripe: failed safely, with no checkpoint and backoff. Causes and fixes are in the [runbook](../JOB_MONITOR.md#pilot-databricks-palantir-stripe-scale-ai-cloudflare-configured-2026-11-11-not-activated).
+
+**Eligibility.** The pilot review found two leaks, now fixed with tests: "Team/Tech Lead" titles weren't treated as senior, and Doha/Vilnius and other non-US cities weren't excluded. An offline re-evaluation used the hash-verified baseline text. The shortlist now has 133 reviewable postings (Palantir 73, Cloudflare 18, Scale AI 8, plus the rest); the top 10 are all new-grad roles, with the best score 72 (Palantir Forward Deployed Software Engineer, New Grad – Commercial). None is qualified or high priority: every pilot posting still lacks a verified "never applied" answer for that employer, and most lack an employer start date.
+
+**Deduplication and recovery (rehearsal on a disposable copy of the real data, with replayed real responses).** Fourteen of 14 checks passed:
+- Only the five pilot sources were polled.
+- Identical feeds produced 0 new, 0 updated and 0 alerts; a 304 was recorded as unchanged.
+- An oversized response was recorded as `response_too_large` and backed off for 120 minutes; it was skipped while not due, and the first success afterwards was a quiet baseline.
+- One new reviewable posting produced exactly one alert, and none on repeat.
+- A crashed worker's lease was respected, then reclaimed after it expired.
+- A paused source was never polled, and revoke stopped all polling.
+
+The real data was byte-identical afterwards, and the copy was deleted.
+
+**Health on real data:** scheduler `not_authorized`. Databricks and Stripe are `failing` (`provider_unavailable`, recorded before the new categories). Palantir and Scale AI show `ok_changes` until their next poll, because their baselines were recorded before the baseline flag existed.
+
+**Validation:** 413 related Node regressions passed (72 monitor/scheduler cases). Typecheck/build and the job-monitor, job-monitor-cache and career-central browser suites passed. A read-only real-data dashboard check at 375/1440px showed 100 cards (81 from pilot employers), "Recurring monitoring: not authorized", per-source health, and no writes, external requests, errors or byte changes. The tick wrapper refused without authorization on a copy. No recurring authorization, OS trigger, application, email, push or cloud action.
+
 ## Local monitoring-storage migration applied — 2026-11-11
 
 Applied with the user's approval: `npm run monitor -- migrate-store --apply` at 2026-11-11T00:42:24Z, from commit `9e7622c6`.

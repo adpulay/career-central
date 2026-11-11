@@ -37,7 +37,7 @@ npm run monitor -- schedule --source cloudflare --minutes 15
 
 `npm run monitor -- reevaluate` re-applies the current evaluator and saved profile to stored postings offline: no network, alerts, tasks, decisions, checkpoints or application records change. Stored postings keep only a description excerpt, so full text from `data/discovery/raw-latest.json` is used only when its content hash equals the posting's latest observed hash. Evidence is labeled per posting: `live_feed` (hash-verified live content from a check under 24 hours old), `cached_snapshot` (cache-seeded, no longer listed, or a live check over 24 hours old) or `stored_excerpt` (no verifiable full text). The last two always keep the posting in review; neither is current eligibility evidence. Postings with no verifiable text keep their previous result and are counted as `unavailable`.
 
-Configuration file is an array, at most five sources. Example (not itself authorization):
+Configuration file is an array; at most eight sources may be configured in total (only sources named in a recurring authorization are polled by `tick`). Example (not itself authorization):
 
 ```json
 [
@@ -84,6 +84,42 @@ npm run monitor -- revoke-recurring             # emergency stop for recurring p
 Rollback keeps state recorded after migration; a restored pre-migration backup (`data/backups/job-monitor-premigration-*`, with `manifest.json` holding the hashes) is the fallback when the split store is unreadable. Both directions resume after an interruption only when the two copies are identical, and otherwise fail closed. A simulated 8-hour scheduler scenario (per-employer intervals, crash reclaim, outage backoff, Retry-After, pause/resume, expiry, quiet baselines, one alert per version) is in `tests/job-monitor-scheduler.test.mjs`.
 
 Activation checklist (each step needs the user's explicit approval): apply the store migration; run one `first-poll` per source; choose sources, interval (15 minutes or more until a source's policy and budget support less), authorization duration and polls per tick; install one OS trigger at about the shortest interval; check `health` after the first ticks; revoke and remove the trigger to stop.
+
+## Pilot: Databricks, Palantir, Stripe, Scale AI, Cloudflare (configured 2026-11-11, not activated)
+
+Configured locally at a 30-minute target. Datadog and MongoDB stay configured (history preserved) but are outside the pilot authorization, so `tick` never polls them. At most eight sources may be configured.
+
+**First-seen baselines.** Palantir (304 postings) and Scale AI (169) were established by one bounded `first-poll` each, quietly: every posting is `baseline`, with no alerts or proposals. Cloudflare already had a live baseline. Databricks and Stripe failed safely, with no checkpoint, no postings and exponential backoff:
+- **Databricks:** most likely the old 8 MiB response cap. It is the largest board, and the failure came within about 1 s. The cap is now 24 MiB.
+- **Stripe:** its optional `/offices` lookup timed out after the job list loaded. A cycle with a failed lookup is deliberately failed, because a partial snapshot would change remote postings' locations and trigger false "updated" alerts.
+
+Failure categories are now precise and sanitized (`response_too_large`, `timeout`, `http_<status>`, `enrichment_*`, `rate_limit`), and health reports a failed first poll as `failing`, not `never_polled`.
+
+**Cadence note.** The 30-minute target is honored as a minimum. Quiet feeds stretch adaptively (60 → 90 → 120 minutes after 4/8/12 quiet cycles), and backoff and Retry-After can delay further. A trigger every 10 minutes keeps scheduling lag at 10 minutes or less while the PC is awake. Ticks don't run while Windows or WSL sleeps; health then reports `stale`/`overdue`.
+
+**Activation package (requires separate approval; nothing below has been run):**
+
+```sh
+# 1. Pending baselines, after their backoff (≥ 01:53 UTC 2026-11-11); quiet by design
+npm run monitor -- first-poll --source databricks --authorize-live-read
+npm run monitor -- first-poll --source stripe --authorize-live-read
+# 2. Seven-day recurring authorization for exactly the pilot sources
+npm run monitor -- authorize-recurring --source databricks,palantir,stripe,scaleai,cloudflare --hours 168 --max-polls 5
+```
+
+```bat
+:: 3. Windows Task Scheduler trigger (every 10 minutes, runs while the user is logged on)
+schtasks /Create /TN "CareerCentral\MonitorTick" /SC MINUTE /MO 10 /F /TR "wsl.exe -d Ubuntu -u root -- /home/adam/JobScraper/career-ops/scripts/job-monitor-tick.sh"
+```
+
+`scripts/job-monitor-tick.sh` runs one tick and appends a sanitized JSON line to `data/logs/job-monitor-tick.log` (0600, rotated at 5 MiB). Without an unexpired authorization it exits 1 with `MONITOR_RECURRING_NOT_AUTHORIZED` and polls nothing; this was verified on a copy of the data.
+
+**Pause or stop at any time:**
+- `npm run monitor -- pause --source <id>` and `resume` work per source.
+- `npm run monitor -- revoke-recurring` stops all polling on the next tick.
+- `schtasks /Delete /TN "CareerCentral\MonitorTick" /F` removes the trigger.
+
+The authorization expires after 168 hours; ticks then poll nothing and health shows `authorization_expired`.
 
 ## Persistence and recovery contract
 

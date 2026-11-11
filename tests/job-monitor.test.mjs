@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
-import {configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval, graduationWindow, reevaluatePostings, START_UNCONFIRMED} from '../lib/career-central/job-monitor.mjs';
-import {createFeedReader} from '../lib/career-central/monitor-feed.mjs';
+import {failureCategory, configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval, graduationWindow, reevaluatePostings, START_UNCONFIRMED} from '../lib/career-central/job-monitor.mjs';
+import {createFeedReader, MONITOR_MAX_FEED_BYTES} from '../lib/career-central/monitor-feed.mjs';
 import {updateLedger} from '../lib/applications/store.mjs';
 import {updateMonitor, monitorBackend, migrateMonitorStore} from '../lib/career-central/monitor-store.mjs';
 const now = Date.parse('2026-11-10T12:00:00Z'), step = 360000;
@@ -459,4 +459,43 @@ test('early-career and university-graduate titles count as entry level, matching
   for (const title of ['[2027] Software Engineer, Early Career', 'Backend Software Engineer - University Graduate 2027', 'Software Engineer, Early Career (NYC)'])
     assert.ok(!evaluate({title}).unknowns.includes('Entry-level seniority requires review'), title);
   assert.ok(evaluate({title: 'Software Engineer'}).unknowns.includes('Entry-level seniority requires review'));
+});
+
+test('feed failures record precise sanitized categories (size, timeout, enrichment, status) and fail closed', () => fixture(async root => {
+  await configureSources(root, [source]);
+  const tooLarge = Object.assign(Error('HTTP body exceeded maxBytes of 25165824 (content-length 30000000) PRIVATE'), {maxBytes: 25165824});
+  const cases = [
+    [async () => {throw tooLarge;}, 'response_too_large'],
+    [async () => {throw Object.assign(Error('This operation was aborted'), {name: 'AbortError'});}, 'timeout'],
+    [async () => new Response('PRIVATE', {status: 503}), 'http_503'],
+  ];
+  let time = now;
+  for (const [request, category] of cases) {
+    time += 86400000 * 2;
+    const result = await poll(root, [], time, {mode: 'live', authorizeLiveRead: true, fetchSnapshot: createFeedReader({request})});
+    assert.equal(result.state, 'failed'); const stored = readMonitor(root).sources.fictional;
+    assert.equal(stored.errorCategory, category); assert.equal(stored.checkpoint, null, 'no baseline from a failed read');
+    assert.ok(!JSON.stringify(stored).includes('PRIVATE'));
+  }
+  // Optional /offices enrichment failing after a successful list still fails the cycle, labeled as enrichment.
+  let calls = 0;
+  const offices = createFeedReader({request: async () => {
+    calls++;
+    if (calls === 1) return Response.json({jobs: [{id: 101, title: job().title, absolute_url: job().url, content: job().description, location: {name: 'Remote'}}]});
+    throw Object.assign(Error('This operation was aborted'), {name: 'AbortError'});
+  }});
+  await assert.rejects(offices(source, null), error => failureCategory(error) === 'enrichment_timeout');
+  assert.equal(calls, 2, 'list plus one enrichment request; no extra retries');
+  assert.equal(MONITOR_MAX_FEED_BYTES, 24 * 1024 * 1024);
+}));
+
+test('pilot review leaks: lead titles are senior; additional non-US cities are excluded without touching US namesakes', () => {
+  for (const title of ['Team Lead, ARC Software Engineering Team', 'Tech Lead, Platform', 'Lead Software Engineer, Infrastructure'])
+    assert.ok(evaluate({title}).exclusions.includes('Title indicates substantial seniority'), title);
+  for (const title of ['Software Engineer I, Lead Generation Platform', 'Platform Engineer I'])
+    assert.ok(!evaluate({title}).exclusions.includes('Title indicates substantial seniority'), title);
+  for (const location of ['Doha, Qatar', 'Vilnius, Lithuania', 'Belgrade, Serbia', 'Dubai, United Arab Emirates'])
+    assert.ok(evaluate({location}).exclusions.includes('Listed location outside United States'), location);
+  assert.ok(!evaluate({location: 'Athens, GA'}).exclusions.includes('Listed location outside United States'));
+  assert.ok(!evaluate({location: 'New York, NY; Doha, Qatar'}).exclusions.includes('Listed location outside United States'), 'a US option keeps the posting');
 });
