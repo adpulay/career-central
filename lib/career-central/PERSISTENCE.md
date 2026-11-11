@@ -1,5 +1,7 @@
 # M3B — Operational persistence and recovery
 
+Monitor storage update (2026-11-11): new data roots keep job-monitor state in its own split store, `data/job-monitor/` ([monitor-store.mjs](monitor-store.mjs)), not the application ledger. Existing in-ledger state remains supported until the explicit verified `migrate-store --apply`. The ledger owner, application records and email state are unchanged by monitor writes on the split store.
+
 Later additive owner extension (2026-11-10): [job monitor v1](JOB_MONITOR.md)
 uses the existing application-ledger lock/atomic writer for `jobMonitor` source
 checkpoints, shortlist dispositions, alerts and local preparation proposals.

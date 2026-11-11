@@ -8,7 +8,12 @@ const url = process.env.JOB_MONITOR_CACHE_TEST_URL, root = process.env.JOB_MONIT
 test('30 cached opportunities show explicit incomplete eligibility without writes or live requests', {skip: liveServerSkip('JOB_MONITOR_CACHE_TEST_URL', 'JOB_MONITOR_CACHE_TEST_ROOT'), timeout: 120000}, async t => {
   assert.ok(fs.realpathSync(root).startsWith(fs.realpathSync(os.tmpdir()) + path.sep));
   assert.equal(fs.readFileSync(path.join(root, '.career-central-fixture'), 'utf8'), 'fictional-only');
-  const file = path.join(root, 'data/application-automation/ledger.json'), before = fs.readFileSync(file), base = new URL(url);
+  // Snapshot every monitor/ledger byte: the page must not write anything.
+  const snapshot = () => ['data/application-automation/ledger.json', 'data/job-monitor'].flatMap(rel => {
+    const full = path.join(root, rel); if (!fs.existsSync(full)) return [[rel, null]];
+    return fs.statSync(full).isDirectory() ? fs.readdirSync(full, {recursive: true}).map(name => path.join(full, name)).filter(name => fs.statSync(name).isFile()).map(name => [name, fs.readFileSync(name).toString('base64')]) : [[rel, fs.readFileSync(full).toString('base64')]];
+  });
+  const before = snapshot(), base = new URL(url);
   const {chromium} = await import('playwright-core');
   const browser = await chromium.launch({executablePath: process.env.CAREER_CENTRAL_CHROME_EXECUTABLE, headless: true}); t.after(() => browser.close());
   const page = await browser.newPage(), errors = []; let writes = 0, external = 0;
@@ -29,5 +34,5 @@ test('30 cached opportunities show explicit incomplete eligibility without write
     assert.equal(await page.getByRole('heading', {name: 'Local preparation tasks', exact: true}).count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
-  assert.equal(writes, 0); assert.equal(external, 0); assert.deepEqual(errors, []); assert.deepEqual(fs.readFileSync(file), before);
+  assert.equal(writes, 0); assert.equal(external, 0); assert.deepEqual(errors, []); assert.deepEqual(snapshot(), before);
 });

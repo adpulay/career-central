@@ -1,5 +1,23 @@
 # Latest handoff
 
+## Recurring-monitoring readiness and local scheduler prepared — 2026-11-11
+
+Readiness gaps found and closed locally: monitor state shared the application ledger under one 3 MiB cap (a fourth employer would fail, and every poll rewrote application/email history), and there was no tick, activation record or health model. Added the split per-source store with a verified migration, a gated scheduler tick and distinct health states; see [STATUS](STATUS.md) and the [runbook](../JOB_MONITOR.md).
+
+The user's real data was not migrated; it remains in legacy mode and works as before. Recurring monitoring is neither authorized nor installed.
+
+Next milestone: controlled activation, with each step needing explicit user approval.
+
+1. `migrate-store --apply` on real data, after a backup.
+2. One `first-poll` per approved source.
+3. Choose sources, interval (15 minutes or more), authorization duration and polls per tick.
+4. Install one OS trigger for `tick --authorize-live-read`.
+5. Accept after observing the first ticks via `health`: no duplicate alerts, honest overdue/failure states, and revocation works.
+
+After that: more employers within the five-source limit, and quiet-hours/snooze.
+
+A cloud infrastructure audit requested earlier in this session was paused in favor of this work. Its main early finding (the storage cliff) is resolved here, and the per-source partition maps directly onto a future cloud partition key. The full cloud deliverables remain to be written.
+
 ## Role classification and potentially-eligible start state — 2026-11-11
 
 Fixed "Infrastructure Business Operations Associate" passing the technical filter: `infrastructure` matched the role family and nothing caught the business function. The non-technical rule now excludes a business-function title only when it has no engineering noun. Unstated employer start dates stay unresolved but are no longer conflated with candidate-side gaps or ineligibility. A posting whose only gap is the employer start date becomes `potentially_eligible`: it is shortlisted first after qualified postings and can alert and receive a preparation proposal, but it is never submission-ready. Details and validation are in [STATUS](STATUS.md). The current 27-posting shortlist has no start-only cases.

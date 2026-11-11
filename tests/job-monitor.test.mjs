@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval, graduationWindow, reevaluatePostings, START_UNCONFIRMED} from '../lib/career-central/job-monitor.mjs';
 import {createFeedReader} from '../lib/career-central/monitor-feed.mjs';
 import {updateLedger} from '../lib/applications/store.mjs';
+import {updateMonitor, monitorBackend, migrateMonitorStore} from '../lib/career-central/monitor-store.mjs';
 const now = Date.parse('2026-11-10T12:00:00Z'), step = 360000;
 const source = {id: 'fictional', company: 'Fictional Cloud', provider: 'greenhouse', board: 'fictional', intervalMinutes: 5};
 const profile = {education: [{graduation_month: {value: '2027-05', verified: true}}],
@@ -117,7 +118,7 @@ test('crash before atomic checkpoint leaves no posting/alert/task; retry restore
   await poll(root, [job()], now + step * 4); assert.equal(monitorView(root).alerts.length, 1);
 }));
 test('abandoned worker lease recovers after expiry and fences concurrent workers', () => fixture(async root => {
-  await configureSources(root, [source]); await updateLedger(root, ledger => {ledger.jobMonitor.sources.fictional.lease = {token: 'dead-worker', until: now + 90000};});
+  await configureSources(root, [source]); await updateMonitor(root, monitor => {monitor.sources.fictional.lease = {token: 'dead-worker', until: now + 90000};});
   assert.equal((await poll(root, [])).skipped, 'busy');
   let release; const pending = new Promise(resolve => {release = resolve;});
   const first = poll(root, [], now + step, {fetchSnapshot: async () => {await pending; return {jobs: [], complete: true};}});
@@ -382,7 +383,7 @@ test('issue 7: offline re-evaluation uses only hash-verified text and ages live 
   await poll(root, [job('101', {description: long}), job('102', {description: long}), job('103', {title: 'Vice President, Cloud GTM'})], now + step, {mode: 'live', authorizeLiveRead: true});
   await setMonitorDecision(root, {postingId: monitorView(root).jobs[0].id, decision: 'interested'});
   const before = readMonitor(root), ledgerFile = path.join(root, 'data/application-automation/ledger.json');
-  const beforeLedger = JSON.parse(fs.readFileSync(ledgerFile, 'utf8'));
+  const ledgerBytes = () => fs.existsSync(ledgerFile) ? fs.readFileSync(ledgerFile) : null, beforeLedger = ledgerBytes();
   const descriptions = new Map([['greenhouse:fictional:101', long], ['greenhouse:fictional:102', long + ' Edited later.'], ['greenhouse:fictional:103', job().description]]);
   const fresh = await reevaluatePostings({root, context, descriptions, now: now + step * 2});
   assert.deepEqual(fresh.evidence, {live_feed: 2, stored_excerpt: 1}); assert.equal(fresh.unavailable, 0);
@@ -393,10 +394,10 @@ test('issue 7: offline re-evaluation uses only hash-verified text and ages live 
   const stale = await reevaluatePostings({root, context, descriptions, now: now + step + 86400001});
   assert.deepEqual(stale.evidence, {cached_snapshot: 2, stored_excerpt: 1});
   assert.ok(byPosting('101').match.unknowns.includes('Cached job description is not current eligibility evidence; verify the live posting'));
-  const after = readMonitor(root), afterLedger = JSON.parse(fs.readFileSync(ledgerFile, 'utf8'));
+  const after = readMonitor(root), afterLedger = ledgerBytes();
   assert.deepEqual(after.alerts, before.alerts); assert.deepEqual(after.preparationTasks, before.preparationTasks); assert.deepEqual(after.sources, before.sources);
   assert.deepEqual(Object.values(after.postings).map(row => [row.id, row.decision, row.contentHash, row.firstSeenAt, row.availability]), Object.values(before.postings).map(row => [row.id, row.decision, row.contentHash, row.firstSeenAt, row.availability]));
-  assert.deepEqual(afterLedger.jobs, beforeLedger.jobs); assert.deepEqual(afterLedger.events, beforeLedger.events);
+  assert.deepEqual(afterLedger, beforeLedger, 'application ledger untouched'); assert.equal(monitorBackend(root), 'split');
 }));
 test('issue 1: negation is scoped to the skill mention, not a long run-on requirement block', () => {
   const block = 'Required: Experience working with Go, Python, Java, or equivalent programming languages Knowledge of SQL and common relational database systems such as PostgreSQL and MySQL Experience with dashboards and reporting tools is preferred';

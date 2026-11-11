@@ -59,6 +59,29 @@ This performs one due source cycle, at most two allowlisted public GETs, with re
 
 Before live acceptance obtain the exact employer/feed, two-request maximum, one-cycle scope and saved-alert behavior. Before recurring operation obtain separately the source allowlist, desired intervals, request budget, duration, retention and outage behavior. An ongoing worker/OS-scheduler integration is not installed by this release. Do not put this command into cron/Task Scheduler without that explicit authorization and subsequent worker acceptance. No five-minute blanket polling or guaranteed real-time detection.
 
+## Recurring scheduler (prepared, not activated)
+
+The scheduler is a single tick command for an external trigger. No cron, systemd, Task Scheduler or background loop is installed, and nothing activates by itself.
+
+```sh
+npm run monitor -- health                       # scheduler + per-source operational state (read-only)
+npm run monitor -- migrate-store                # dry run: partition sizes and lossless round-trip check
+npm run monitor -- migrate-store --apply        # move monitor state out of the application ledger
+npm run monitor -- authorize-recurring --source cloudflare,datadog --hours 72 --max-polls 3
+npm run monitor -- tick --authorize-live-read   # one pass; what the external trigger would run
+npm run monitor -- revoke-recurring             # emergency stop for recurring polls
+```
+
+- **Activation gates.** `tick` refuses without `--authorize-live-read` and without an unexpired persisted authorization naming exact sources. Authorizations last at most 30 days, allow 1–5 polls per tick and can be revoked at any time. Paused or unauthorized sources are never polled and don't consume the tick budget.
+- **Reliability.** Each source cycle reuses `poll-once`: per-source leases fence competing workers, Retry-After and exponential backoff persist across ticks, adaptive intervals add jitter, conditional reads skip unchanged feeds, and alerts and preparation proposals are keyed by posting and version, so redelivery or re-polling never duplicates them. Overlapping ticks skip (`tick_in_progress`) rather than queue.
+- **Storage.** Recurring polls require the split store (`data/job-monitor/`), one partition per source with a 3 MiB budget each. Polls then never rewrite the application ledger. An existing in-ledger section keeps working in legacy mode until `migrate-store --apply`. That command verifies a lossless round trip, records the legacy content hash, and only then removes the section from the ledger. It can resume after an interruption, and a conflicting copy fails closed.
+- **Health states**, which are deliberately distinct:
+  - Per source: `ok_no_changes` (healthy, nothing new), `ok_changes`, `failing`, `rate_limited`, `overdue` (authorized and past due plus a grace of twice the interval, minimum 10 minutes), `polling`, `worker_lost` (expired lease, reclaimed on the next tick), `paused`, `never_polled`, `cached_only`.
+  - Scheduler: `not_authorized`, `authorization_expired`, `authorized_never_ran`, `running`, `running_with_failures`, `stale` (no tick within twice the shortest interval, minimum 10 minutes).
+  - A preparation proposal awaiting review is monitor state; failed or awaiting-approval applications remain application-workflow states.
+
+Activation checklist (each step needs the user's explicit approval): apply the store migration; run one `first-poll` per source; choose sources, interval (15 minutes or more until a source's policy and budget support less), authorization duration and polls per tick; install one OS trigger at about the shortest interval; check `health` after the first ticks; revoke and remove the trigger to stop.
+
 ## Persistence and recovery contract
 
 `ledger.jobMonitor` schemaVersion 1 is a derived operational namespace inside the existing application ledger, written only by `updateLedger`. Existing jobs/events/receipts/email health/sending reservations are untouched. It is not a second canonical application tracker. See [owner contract](../lib/career-central/JOB_MONITOR.md).

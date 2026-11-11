@@ -1,5 +1,22 @@
 # Verified project state
 
+## Recurring-monitoring readiness and local scheduler — 2026-11-11
+
+Readiness audit findings:
+
+- **Storage cliff.** All monitor state lived in the application ledger under a single 3 MiB budget. Three employers already used 2.37 MB, so a fourth or fifth would fail with `MONITOR_CAPACITY_REVIEW_REQUIRED`. Every poll also rewrote the whole ~2.5 MB ledger holding application history and email state.
+- **No scheduler trigger.** Only per-source `poll-once` existed; there was no tick, no activation record and no operational health classification.
+
+Implemented locally (nothing activated):
+
+- **Split monitor store** (`lib/career-central/monitor-store.mjs`): per-source partitions under `data/job-monitor/`, one atomic file per source, with the index written last. Polls never touch the application ledger. Fresh roots use it; existing in-ledger state stays in legacy mode until an explicit `migrate-store --apply`. Migration verifies a canonical lossless round trip, records the legacy hash, removes only the ledger's `jobMonitor` section, and resumes or fails closed after an interruption.
+- **Scheduler tick** (`lib/career-central/monitor-scheduler.mjs`): one non-overlapping pass over due, authorized, unpaused sources with a per-tick poll budget. It requires `--authorize-live-read` plus a persisted authorization naming exact sources that expires within 30 days and can be revoked. It reuses the existing leases, backoff/Retry-After, adaptive intervals, jitter, conditional reads and per-version alert/proposal deduplication.
+- **Health:** distinct per-source states (no changes, changes, failing, rate limited, overdue, polling, worker lost, paused, never polled, cached only) and scheduler states (not authorized, expired, never ran, running, running with failures, stale). They appear in `health`, `monitorView` and on the dashboard.
+
+Real data: still in legacy mode, deliberately not migrated. A dry run passed (3 partitions of 0.96, 0.79 and 0.73 MB; 1,307 postings) with the ledger byte-identical. Its first attempt failed closed because posting key order differed across interleaved sources; verification now compares canonically, and a regression test reproduces the case. A rehearsal on a disposable copy of the real data migrated successfully: the dashboard view, counts and health were identical, the ledger minus its monitor section was identical, and the ledger shrank from 3.4 MB to 242 KB. The copy was deleted. Health on real data: scheduler `not_authorized`; all three sources `ok_no_changes`.
+
+Validation: 403 related Node regressions passed, zero failures/skips (52 monitor and 10 new store/scheduler cases). Typecheck/build and the job-monitor, job-monitor-cache and career-central browser suites passed, including scheduler/source health labels and checks that no ledger or monitor bytes are written by viewing. No live feed request, OS trigger, recurring authorization, email, application, push or cloud action occurred.
+
 ## Role classification and start-date state — 2026-11-11
 
 - **Role classification:** business-function titles (now including business operations, strategy & operations, procurement and supply chain) are excluded only when the title has no engineering function noun (engineer, developer, SRE, DevOps, architect, administrator). "Infrastructure Business Operations Associate" is excluded; cloud, platform, DevOps, backend and SRE engineering titles, and engineering roles in business domains ("Software Engineer, Finance Platform"), still pass. The previous rule would have wrongly excluded that last kind of title.

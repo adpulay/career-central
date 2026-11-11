@@ -7,6 +7,7 @@ type Job = {id: string; title: string; company: string; location: string; salary
 type View = {available: boolean; error?: string; totalJobs?: number; jobs?: Job[];
   sources?: {id: string; company: string; status: string; paused: boolean; intervalMinutes: number; lastSuccessAt: string | null; nextDueAt: string | null; failures: number}[];
   alerts?: {id: string; postingId: string; event: string; status: string; highPriority: boolean}[];
+  health?: {scheduler: string; sources: Record<string, {state: string; recurring: boolean}>};
   tasks?: {id: string; postingId: string; status: string; requiredQuestions: string; missing: string[]; approvals: string[]; resume: {id: string} | null}[]};
 const STATUS_LABELS: Record<string, string> = {qualified: 'Qualified', potentially_eligible: 'Potentially eligible — start date unconfirmed', needs_review: 'Needs review'};
 const statusLabel = (status: string) => STATUS_LABELS[status] ?? status.replaceAll('_', ' ');
@@ -34,9 +35,10 @@ export function JobMonitor() {
       {!view && <p>Loading saved results…</p>}
       {view?.available && <>
         {view.sources?.some(source => source.status === 'cached_baseline') && <p className="text-sm font-medium" data-testid="monitor-cache-warning">Cached snapshot: live availability and employer eligibility still need verification.</p>}
+        {view.health && <p className="text-sm" data-testid="monitor-scheduler-health">Recurring monitoring: {view.health.scheduler.replaceAll('_', ' ')}</p>}
         {!view.sources?.length && <p>No sources configured. Use the local monitor setup after reviewing the proposed employers.</p>}
         {view.sources?.map(source => <div key={source.id} className="flex flex-wrap items-center gap-3 border-t border-border pt-2 text-sm">
-          <span>{source.company}: {source.status.replaceAll('_', ' ')}{source.paused ? ' (paused)' : ''}</span><span>Target: {source.intervalMinutes} min</span><span>Last success: {when(source.lastSuccessAt)}</span><span>Failures: {source.failures}</span>
+          <span>{source.company}: {source.status.replaceAll('_', ' ')}{source.paused ? ' (paused)' : ''}</span><span data-testid="monitor-source-health">Health: {(view.health?.sources?.[source.id]?.state ?? 'unknown').replaceAll('_', ' ')}</span><span>Target: {source.intervalMinutes} min</span><span>Last success: {when(source.lastSuccessAt)}</span><span>Failures: {source.failures}</span>
           <button className={button} disabled={busy} onClick={() => void save({pausedSource: source.id, paused: !source.paused})}>{source.paused ? 'Allow future manual polls' : 'Pause source'}</button>
         </div>)}
       </>}
