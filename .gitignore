@@ -243,6 +243,7 @@ career-dashboard
 career-dashboard.exe
 package-lock.json
 !web/package-lock.json
+!infra/package-lock.json
 
 # Playwright MCP server run artifacts (ephemeral, machine-local)
 .playwright-mcp/
