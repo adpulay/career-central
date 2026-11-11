@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureSources, pollSource, readMonitor, setMonitorDecision} from '../lib/career-central/job-monitor.mjs';
 import {createCloudMonitorStore, memoryObjectStore, memoryTable} from '../lib/career-central/cloud-monitor-store.mjs';
-import {authorizeRecurring, revokeRecurring} from '../lib/career-central/monitor-scheduler.mjs';
+import {authorizeRecurring, revokeRecurring, runMonitorTick} from '../lib/career-central/monitor-scheduler.mjs';
 import {buildEligibilityProjection, contextFromProjection} from '../lib/career-central/eligibility-projection.mjs';
 import {createMonitorHandler} from '../lib/career-central/monitor-handler.mjs';
 
@@ -117,4 +117,84 @@ test('ambiguous writes (applied, then an error) recover without duplicate alerts
   await store.refresh(); assert.equal(readMonitor(store).sources.alpha.lease, null);
   assert.equal(readMonitor(store).sources.alpha.lastSuccessAt, new Date(now + 7 * hour).toISOString(), 'the committed cycle stands');
   assert.equal((await poll(store, [job('1'), job('2'), job('3')], now + 9 * hour)).alerts, 0); assert.equal(await alerts(store), 3);
+});
+
+test('a worker that loses its lease before committing publishes nothing; the takeover worker\'s state stands', async () => {
+  const {instance} = backing(), a = instance(), b = instance();
+  await configureSources(a, [src('alpha')]); await poll(a, [], now);
+  let resume; const gate = new Promise(resolve => {resume = resolve;});
+  const slow = poll(a, [job('slow')], now + hour, {fetchSnapshot: async () => {await gate; return {jobs: [job('slow')], complete: true};}});
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const takeover = await poll(b, [job('1')], now + hour + 120000); // A's 90 s lease expired
+  assert.equal(takeover.alerts, 1);
+  resume(); const stale = await slow;
+  assert.equal(stale.state, 'failed'); assert.equal(stale.checkpointAdvanced, false); assert.equal(stale.errorCategory, 'MONITOR_LEASE_LOST');
+  await b.load();
+  assert.ok(!Object.values(readMonitor(b).postings).some(row => row.postingId === 'slow'));
+  assert.equal(readMonitor(b).sources.alpha.checkpoint.checkedAt, new Date(now + hour + 120000).toISOString());
+  assert.equal(await alerts(b), 1);
+});
+
+test('a definite commit failure advances nothing and alerts nothing; the retry publishes exactly once', async () => {
+  let reject = false;
+  const objects = memoryObjectStore({beforePut: () => {if (reject) {reject = false; throw Object.assign(Error('PreconditionFailed'), {code: 'PreconditionFailed'});}}});
+  const worker = createCloudMonitorStore({objects, table: memoryTable()});
+  await configureSources(worker, [src('alpha')]); await poll(worker, [], now);
+  const checkpointBefore = (await worker.load()).sources.alpha.checkpoint;
+  reject = true; // the publish PUT is rejected (412) without being applied
+  const result = await poll(worker, [job('1')], now + hour);
+  assert.equal(result.state, 'failed'); assert.equal(result.checkpointAdvanced, false); assert.equal(result.errorCategory, 'MONITOR_STORE_CONFLICT');
+  const after = await worker.load();
+  assert.deepEqual(after.sources.alpha.checkpoint, checkpointBefore, 'checkpoint not advanced');
+  assert.equal(Object.keys(after.alerts).length, 0, 'no alert from the failed commit');
+  assert.equal(after.sources.alpha.lease, null, 'failure path released the lease');
+  const retry = await poll(worker, [job('1')], Date.parse(after.sources.alpha.nextDueAt) + 1000);
+  assert.equal(retry.alerts, 1); assert.equal(await alerts(worker), 1);
+  assert.equal((await poll(worker, [job('1')], Date.parse((await worker.load()).sources.alpha.nextDueAt) + 1000)).alerts, 0, 'retry is idempotent');
+});
+
+test('a change committed by another container between claim and publish is preserved, not overwritten', async () => {
+  const {instance} = backing(), worker = instance(), other = instance();
+  await configureSources(worker, [src('alpha')]); await poll(worker, [job('1')], now);
+  const firstId = Object.keys((await worker.load()).postings)[0];
+  const result = await poll(worker, [job('1'), job('2')], now + hour, {fetchSnapshot: async () => {
+    await setMonitorDecision(other, {postingId: firstId, decision: 'interested'});
+    return {jobs: [job('1'), job('2')], complete: true};
+  }});
+  assert.equal(result.alerts, 1);
+  assert.equal((await worker.load()).postings[firstId].decision, 'interested', 'publish re-read current state inside its conditional write');
+});
+
+test('an ambiguous publish is reported as an unknown outcome, never as a clean failure', async () => {
+  let ambiguous = false;
+  const {instance} = backing({objectFault: () => {if (ambiguous) {ambiguous = false; throw fail('NetworkError');}}});
+  const store = instance();
+  await configureSources(store, [src('alpha')]); await poll(store, [], now);
+  ambiguous = true;
+  const result = await poll(store, [job('1')], now + hour);
+  assert.deepEqual({state: result.state, errorCategory: result.errorCategory, checkpointAdvanced: result.checkpointAdvanced}, {state: 'failed', errorCategory: 'persistence_outcome_uncertain', checkpointAdvanced: 'unknown'});
+});
+
+test('a stale snapshot never authorizes a tick: runMonitorTick loads authoritative state itself', async () => {
+  const {instance} = backing(), a = instance(), b = instance();
+  await configureSources(a, [src('alpha')]); await authorizeRecurring(a, {sourceIds: ['alpha'], hours: 24, now});
+  await a.load(); // a's snapshot says "authorized"
+  await b.load(); await revokeRecurring(b);
+  let fetched = 0;
+  await assert.rejects(runMonitorTick({root: a, context, authorizeLiveRead: true, now: now + 60000, fetchSnapshot: async () => {fetched++; return {jobs: [], complete: true};}}),
+    {code: 'MONITOR_RECURRING_NOT_AUTHORIZED'});
+  assert.equal(fetched, 0);
+});
+
+test('an unchanged poll writes exactly the control item twice (claim, release) and nothing else', async () => {
+  let objectPuts = 0; const tableWrites = [];
+  const {instance} = backing({objectFault: () => {objectPuts++;}, tableFault: (pk, sk) => {tableWrites.push(`${pk}/${sk}`);}});
+  const store = instance();
+  await configureSources(store, [src('alpha')]);
+  const jobs = [job('1')];
+  await poll(store, jobs, now); await poll(store, jobs, now + hour);
+  objectPuts = 0; tableWrites.length = 0;
+  await poll(store, jobs, now + 2 * hour);
+  assert.equal(objectPuts, 0, 'no partition PUT');
+  assert.deepEqual(tableWrites, ['SOURCE#alpha/CONTROL', 'SOURCE#alpha/CONTROL'], 'claim + release only; no index write');
 });
