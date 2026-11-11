@@ -28,8 +28,20 @@ test('30 cached opportunities show explicit incomplete eligibility without write
   for (const width of [375, 1440]) {
     await page.setViewportSize({width, height: 900}); await page.goto(new URL('/career-central', base).href);
     await page.getByTestId('monitor-opportunity').last().waitFor();
-    assert.equal(await page.getByTestId('monitor-opportunity').count(), 30);
-    assert.equal(await page.getByTestId('monitor-eligibility-review').count(), 30);
+    // Paged: every one of the 30 opportunities is reachable through Next, none twice.
+    const seen = new Set();
+    for (let pageNumber = 1; ; pageNumber++) {
+      const summary = await page.getByTestId('monitor-page-summary').innerText();
+      assert.match(summary, /30 qualified or reviewable opportunities\. Showing \d+–\d+ of 30/);
+      for (const id of await page.getByTestId('monitor-opportunity').evaluateAll(cards => cards.map(card => card.id))) {assert.ok(!seen.has(id)); seen.add(id);}
+      assert.equal(await page.getByTestId('monitor-eligibility-review').count(), await page.getByTestId('monitor-opportunity').count());
+      const next = page.getByRole('button', {name: 'Next', exact: true});
+      if (await next.isDisabled()) break;
+      const first = await page.getByTestId('monitor-opportunity').first().getAttribute('id');
+      await next.click(); await page.waitForFunction(id => document.querySelector('[data-testid="monitor-opportunity"]')?.id !== id, first);
+      assert.ok(pageNumber < 5);
+    }
+    assert.equal(seen.size, 30);
     await page.getByTestId('monitor-cache-warning').waitFor();
     assert.equal(await page.getByRole('heading', {name: 'Local preparation tasks', exact: true}).count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

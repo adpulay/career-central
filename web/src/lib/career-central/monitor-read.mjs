@@ -8,7 +8,7 @@ export async function monitorApi({codeRoot = resolveCodeRoot(process.cwd())} = {
   const [core, paths] = await Promise.all([import(/* webpackIgnore: true */ pathToFileURL(file).href), import(/* webpackIgnore: true */ pathToFileURL(resolver).href)]);
   return {core, root: paths.getCareerOpsRoot()};
 }
-export async function readMonitorView(options) {
-  try {const {core, root} = await monitorApi(options); return core.monitorView(root);}
+export async function readMonitorView({offset = 0, limit = 100} = {}, options) {
+  try {const {core, root} = await monitorApi(options); return core.monitorView(root, {offset, limit});}
   catch {return {available: false, error: 'Monitor data unavailable; no data was reset.'};}
 }

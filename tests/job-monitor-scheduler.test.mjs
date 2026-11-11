@@ -327,3 +327,40 @@ test('health: a failed first poll is failing (not never_polled), and a quiet bas
   await poll('baselined', [job('baselined', '1'), job('baselined', '2'), job('baselined', '3')], now + 20 * minute);
   assert.equal(monitorHealth(readMonitor(root), now + 21 * minute).sources.baselined.state, 'ok_changes');
 }));
+
+test('seven-day authorization: --max-polls is per tick only, polling continues to hour 168 and stops exactly at expiry; adaptive 30→120 min', {timeout: 600000}, () => fixture(async root => {
+  const ids = ['p1', 'p2', 'p3', 'p4', 'p5'];
+  await configureSources(root, ids.map(id => src(id, {intervalMinutes: 30})));
+  await authorizeRecurring(root, {sourceIds: ids, hours: 168, maxPollsPerTick: 5, now});
+  const pollsAt = Object.fromEntries(ids.map(id => [id, []]));
+  let clock = now, changeAt = null;
+  const fetchSnapshot = async definition => {
+    pollsAt[definition.id].push(clock);
+    const jobs = [job(definition.id, '1')];
+    if (definition.id === 'p1' && changeAt !== null && clock >= changeAt) jobs.push(job('p1', '2'));
+    return {jobs, complete: true};
+  };
+  const hour = 60 * minute;
+  for (let t = 0; t < 168 * hour; t += 10 * minute) {
+    clock = now + t;
+    if (t === 100 * hour) changeAt = clock;
+    const result = await tick(root, fetchSnapshot, clock);
+    assert.ok(result.polled <= 5);
+  }
+  const total = Object.values(pollsAt).flat().length;
+  assert.ok(total > 5 * 7 * 12, `well beyond any global cap: ${total} polls in 7 days`);
+  for (const id of ids) assert.ok(pollsAt[id].some(time => time >= now + 160 * hour), `${id} still polled on day 7`);
+  // Expiry is time-based: the tick at exactly 168 h polls nothing.
+  await assert.rejects(tick(root, fetchSnapshot, now + 168 * hour), {code: 'MONITOR_RECURRING_NOT_AUTHORIZED'});
+  assert.equal(Object.values(pollsAt).flat().length, total);
+  // Adaptive: quiet feeds stretch 30 → 60 → 90 → 120 minutes and never beyond 120 (plus jitter/tick granularity).
+  const gaps = times => times.slice(1).map((time, index) => (time - times[index]) / minute);
+  const quiet = gaps(pollsAt.p2);
+  assert.ok(quiet.slice(0, 2).every(gap => gap >= 30 && gap < 50), `starts near 30: ${quiet.slice(0, 3)}`);
+  assert.ok(quiet.slice(-5).every(gap => gap >= 120 && gap <= 130), `settles near 120: ${quiet.slice(-5)}`);
+  assert.ok(Math.max(...quiet) <= 130, 'never stretched beyond 4x');
+  // A change resets the stretched interval to 30 minutes.
+  const afterChange = pollsAt.p1.filter(time => time > now + 100 * hour);
+  assert.ok(gaps(afterChange).slice(0, 2).every(gap => gap <= 50), `resets after a change: ${gaps(afterChange).slice(0, 3)}`);
+  assert.equal(Object.keys(readMonitor(root).alerts).length, 1, 'one alert for the one new posting in 7 days');
+}));

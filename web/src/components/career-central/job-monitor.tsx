@@ -4,20 +4,21 @@ import {Card} from '@/components/ui/card';
 
 type Job = {id: string; title: string; company: string; location: string; salary: string | null; url: string; decision: string; firstSeenAt: string; employerPublishedAt: string | null; publicationProvenance: string;
   match: {score: number; status: string; highPriority: boolean; reasons: string[]; unknowns: string[]; gaps: string[]; method: string}};
-type View = {available: boolean; error?: string; totalJobs?: number; jobs?: Job[];
+type View = {available: boolean; error?: string; totalJobs?: number; jobs?: Job[]; page?: {offset: number; limit: number; total: number};
   sources?: {id: string; company: string; status: string; paused: boolean; intervalMinutes: number; lastSuccessAt: string | null; nextDueAt: string | null; failures: number}[];
-  alerts?: {id: string; postingId: string; event: string; status: string; highPriority: boolean}[];
+  alerts?: {id: string; postingId: string; event: string; status: string; highPriority: boolean; title?: string | null; company?: string | null}[];
   health?: {scheduler: string; sources: Record<string, {state: string; recurring: boolean}>};
   tasks?: {id: string; postingId: string; status: string; requiredQuestions: string; missing: string[]; approvals: string[]; resume: {id: string} | null}[]};
 const STATUS_LABELS: Record<string, string> = {qualified: 'Qualified', potentially_eligible: 'Potentially eligible — start date unconfirmed', needs_review: 'Needs review'};
 const statusLabel = (status: string) => STATUS_LABELS[status] ?? status.replaceAll('_', ' ');
 const when = (value?: string | null) => value ? new Date(value).toLocaleString() : 'Unknown';
 export function JobMonitor() {
-  const [view, setView] = useState<View | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const PAGE = 25;
+  const [view, setView] = useState<View | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [offset, setOffset] = useState(0);
   const refresh = useCallback(async () => {
-    try {const response = await fetch('/api/career-central/monitor', {cache: 'no-store'}); const result = await response.json(); setView(result); setError(response.ok ? '' : 'Monitor data unavailable; existing records were preserved.');}
+    try {const response = await fetch(`/api/career-central/monitor?offset=${offset}&limit=${PAGE}`, {cache: 'no-store'}); const result = await response.json(); setView(result); setError(response.ok ? '' : 'Monitor data unavailable; existing records were preserved.');}
     catch {setError('Could not load monitoring data.');}
-  }, []);
+  }, [offset]);
   useEffect(() => {void refresh();}, [refresh]);
   async function save(body: Record<string, unknown>) {
     setBusy(true); setError('');
@@ -45,10 +46,15 @@ export function JobMonitor() {
     </Card>
     {!!view?.alerts?.length && <Card corner="br" className="space-y-3"><h3 className="font-semibold">Posting alerts</h3>
       {view.alerts.map(alert => <div key={alert.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <a href={`#posting-${alert.postingId}`} className="underline">{view.jobs?.find(job => job.id === alert.postingId)?.title ?? 'Posting no longer in active shortlist'}: {alert.event.replaceAll('_', ' ')}{alert.highPriority ? ' · High priority' : ''}</a>
+        <a href={`#posting-${alert.postingId}`} className="underline">{alert.title ? `${alert.company ? `${alert.company} · ` : ''}${alert.title}` : 'Posting no longer monitored'}: {alert.event.replaceAll('_', ' ')}{alert.highPriority ? ' · High priority' : ''}</a>
         <button className={button} disabled={busy} onClick={() => void save({alertId: alert.id, alertStatus: 'dismissed'})}>Dismiss alert</button>
       </div>)}</Card>}
-    {view?.available && <p className="text-sm text-muted">{view.totalJobs ?? 0} qualified or reviewable opportunities. Showing up to 100; fit scores are heuristic, not hiring probabilities.</p>}
+    {view?.available && <p className="text-sm text-muted" data-testid="monitor-page-summary">{view.totalJobs ?? 0} qualified or reviewable opportunities{view.page && view.page.total > 0 ? `. Showing ${view.page.offset + 1}–${Math.min(view.page.offset + view.page.limit, view.page.total)} of ${view.page.total}` : ''}. Fit scores are heuristic, not hiring probabilities.</p>}
+    {view?.available && view.page && view.page.total > view.page.limit && <nav aria-label="Opportunity pages" className="flex items-center gap-3">
+      <button className={button} disabled={busy || view.page.offset === 0} onClick={() => setOffset(Math.max(0, view.page!.offset - PAGE))}>Previous</button>
+      <span className="text-sm">Page {Math.floor(view.page.offset / PAGE) + 1} of {Math.ceil(view.page.total / PAGE)}</span>
+      <button className={button} disabled={busy || view.page.offset + view.page.limit >= view.page.total} onClick={() => setOffset(view.page!.offset + PAGE)}>Next</button>
+    </nav>}
     {view?.jobs?.map(job => <Card corner="br" key={job.id} className="space-y-3" id={`posting-${job.id}`} data-testid="monitor-opportunity">
       <h3 className="font-semibold">{job.company} · {job.title}</h3>
       <p className="text-sm">{job.location || 'Location unknown'} · {job.salary || 'Salary unknown'} · {job.match.score}/100 · <span data-testid="monitor-match-status">{statusLabel(job.match.status)}</span>{job.match.highPriority ? ' · High priority' : ''}</p>

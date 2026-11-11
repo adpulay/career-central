@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {failureCategory, configureSources, pollSource, readMonitor, monitorView, setMonitorDecision, evaluateMonitoredJob, sourceFeed, seedCachedShortlist, setMonitorInterval, graduationWindow, reevaluatePostings, START_UNCONFIRMED} from '../lib/career-central/job-monitor.mjs';
-import {createFeedReader, MONITOR_MAX_FEED_BYTES} from '../lib/career-central/monitor-feed.mjs';
+import {createFeedReader, MONITOR_MAX_FEED_BYTES, inlineOffices} from '../lib/career-central/monitor-feed.mjs';
 import {updateLedger} from '../lib/applications/store.mjs';
 import {updateMonitor, monitorBackend, migrateMonitorStore} from '../lib/career-central/monitor-store.mjs';
 const now = Date.parse('2026-11-10T12:00:00Z'), step = 360000;
@@ -499,3 +499,40 @@ test('pilot review leaks: lead titles are senior; additional non-US cities are e
   assert.ok(!evaluate({location: 'Athens, GA'}).exclusions.includes('Listed location outside United States'));
   assert.ok(!evaluate({location: 'New York, NY; Doha, Qatar'}).exclusions.includes('Listed location outside United States'), 'a US option keeps the posting');
 });
+
+test('Greenhouse office enrichment uses inline offices[] (one request) with locations identical to the /offices endpoint', async () => {
+  const rows = [
+    {id: 1, title: job().title, absolute_url: job().url, content: job().description, location: {name: 'Hybrid'}, offices: [{name: 'New York, NY'}, {name: 'Austin, TX'}]},
+    {id: 2, title: job().title, absolute_url: job().url.replace('101', '102'), content: job().description, location: {name: 'Dallas, TX'}, offices: [{name: 'Dallas, TX'}]},
+  ];
+  const endpointTree = {offices: [{name: 'Austin, TX', departments: [{jobs: [{id: 1}]}]}, {name: 'New York, NY', departments: [{jobs: [{id: 1}]}]}, {name: 'Dallas, TX', departments: [{jobs: [{id: 2}]}]}]};
+  let inlineCalls = 0;
+  const inline = await createFeedReader({request: async () => {inlineCalls++; return Response.json({jobs: rows});}})(source, null);
+  let endpointCalls = 0;
+  const endpoint = await createFeedReader({request: async url => {endpointCalls++;
+    return new URL(url).pathname.endsWith('/offices') ? Response.json(endpointTree) : Response.json({jobs: rows.map(({offices, ...row}) => row)});}})(source, null);
+  assert.equal(inlineCalls, 1); assert.equal(inline.officeSource, 'inline'); assert.equal(inline.requests, 1);
+  assert.equal(endpointCalls, 2); assert.equal(endpoint.officeSource, 'endpoint');
+  assert.deepEqual(inline.jobs.map(row => row.location), endpoint.jobs.map(row => row.location));
+  assert.equal(inline.jobs[0].location, 'Hybrid · Austin, TX · New York, NY');
+  assert.equal(inlineOffices({jobs: [rows[0], {id: 3}]}), null, 'any row without offices[] falls back to the endpoint');
+});
+
+test('paged read model reaches every reviewable posting exactly once; alerts carry their posting title', () => fixture(async root => {
+  await configureSources(root, [source]); await poll(root, []);
+  const many = Array.from({length: 133}, (_, n) => job(String(1000 + n)));
+  await poll(root, many, now + step);
+  const seen = new Set();
+  for (let offset = 0; ; offset += 25) {
+    const view = monitorView(root, {now, offset, limit: 25});
+    assert.equal(view.page.total, 133); assert.equal(view.totalJobs, 133);
+    for (const row of view.jobs) {assert.ok(!seen.has(row.id)); seen.add(row.id);}
+    if (offset + 25 >= view.page.total) break;
+  }
+  assert.equal(seen.size, 133);
+  assert.equal(monitorView(root, {now}).jobs.length, 100, 'default window unchanged');
+  assert.equal(monitorView(root, {now, limit: 1000}).page.limit, 100, 'limit is bounded');
+  assert.equal(monitorView(root, {now, offset: -5}).page.offset, 0);
+  const alert = monitorView(root, {now}).alerts[0];
+  assert.equal(alert.title, job().title); assert.equal(alert.company, source.company);
+}));

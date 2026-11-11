@@ -95,6 +95,12 @@ Configured locally at a 30-minute target. Datadog and MongoDB stay configured (h
 
 Failure categories are now precise and sanitized (`response_too_large`, `timeout`, `http_<status>`, `enrichment_*`, `rate_limit`), and health reports a failed first poll as `failing`, not `never_polled`.
 
+**`--max-polls` semantics (verified).** `maxPollsPerTick` caps how many employer cycles **one tick invocation** starts (1–5). The counter is local to each tick, so there is no global, daily or cumulative poll budget, and nothing ends the authorization early. Expiry is purely time-based (`approvedAt + hours`). A simulated 168-hour run (a tick every 10 minutes, five sources) kept polling every source through hour 160 and beyond, and polled nothing at exactly 168 hours (`tests/job-monitor-scheduler.test.mjs`). With five pilot sources and `--max-polls 5`, every due source fits in one tick. Paused or unauthorized sources don't consume the budget.
+
+**Greenhouse office data.** `content=true` list rows already carry each job's `offices[]`. The monitor's feed reader answers the provider's `/offices` lookup from that inline data, falling back to the endpoint only if any row lacks it. A same-moment live comparison on Cloudflare produced identical location strings for all 478 work-model-only jobs. This removed Stripe's oversized second download (> 24 MiB). `scan.mjs` still uses the endpoint; the same change would help it upstream.
+
+**Dashboard paging.** The monitor API accepts `?offset=&limit=` (limit 1–100), and the dashboard pages 25 at a time with Previous/Next and a "Showing X–Y of N" summary. On the real data, all 140 reviewable postings were reached exactly once across 6 pages.
+
 **Cadence note.** The 30-minute target is honored as a minimum. Quiet feeds stretch adaptively (60 → 90 → 120 minutes after 4/8/12 quiet cycles), and backoff and Retry-After can delay further. A trigger every 10 minutes keeps scheduling lag at 10 minutes or less while the PC is awake. Ticks don't run while Windows or WSL sleeps; health then reports `stale`/`overdue`.
 
 **Activation package (requires separate approval; nothing below has been run):**

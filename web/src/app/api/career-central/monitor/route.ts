@@ -3,8 +3,10 @@ import {checkRequest} from '@/lib/origin-guard.mjs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const headers = {'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'};
-export async function GET() {
-  const view = await readMonitorView();
+export async function GET(request: Request) {
+  // Optional paging: ?offset=N&limit=M (integers; limit 1–100). Anything else is ignored.
+  const params = new URL(request.url).searchParams, int = (value: string | null) => value !== null && /^\d{1,6}$/.test(value) ? Number(value) : undefined;
+  const view = await readMonitorView({offset: int(params.get('offset')) ?? 0, limit: int(params.get('limit')) ?? 100});
   return Response.json(view, {status: view.available ? 200 : 503, headers});
 }
 export async function POST(request: Request) {
