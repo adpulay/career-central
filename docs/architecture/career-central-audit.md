@@ -1,5 +1,9 @@
 # Career Central — Phase 0 repository audit and architecture design
 
+## Product-vision addendum — 2026-11-11
+
+The expanded vision is recorded in [ADR 0004](../career-central/decisions/0004-product-vision-expansion.md), with authoritative subsystem designs under [docs/career-central/design/](../career-central/design/). Cloud stage order follows [ADR 0003](../career-central/decisions/0003-cloud-monitoring-first.md) (monitoring first) and the browser execution model in the [cloud plan §16](../career-central/CLOUD_DEPLOYMENT_PLAN.md#16-browser-execution-model). Section 15 below remains the original evaluation; where they differ, the later documents govern.
+
 ## Product-alignment addendum — 2026-11-10
 
 The detailed Phase 0 audit below is preserved as historical design and source

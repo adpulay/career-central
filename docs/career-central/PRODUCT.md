@@ -1,8 +1,24 @@
 # Career Central product specification
 
-Updated 2026-11-10. Product direction and acceptance requirements, not external-action authorization. See the [feature inventory](FEATURE_INVENTORY.md), [roadmap](ROADMAP.md), [backlog](BACKLOG.md), [current state](CURRENT_STATE.md) and [original architecture audit](../architecture/career-central-audit.md).
+Updated 2026-11-11. Product direction and acceptance requirements, not external-action authorization. See the [feature inventory](FEATURE_INVENTORY.md), [roadmap](ROADMAP.md), [backlog](BACKLOG.md), [current state](CURRENT_STATE.md) and [original architecture audit](../architecture/career-central-audit.md).
 
 ## Product outcome
+
+Guiding motivation: *"I need more of me, but I also need to maintain me."* Career Central increases the owner's productive capacity in a real job search while protecting their control, time and well-being. It isn't a scraper or a mass-application bot. It supports the whole process: finding opportunities, evaluating fit, preparing truthful applications, managing professional relationships, monitoring communications and preparing for interviews.
+
+**Scope priority:** a reliable working product for one person comes first. Use by other people is a possible future direction. Billing, subscriptions, organizations and production multi-tenancy are **out of the near-term roadmap**; data models reserve owner identity so later isolation doesn't need a rewrite ([ADR 0004](decisions/0004-product-vision-expansion.md)).
+
+**Subsystem designs (authoritative definitions):**
+- [Career Identity](design/CAREER_IDENTITY.md)
+- [Job Sources and Provider Capabilities](design/JOB_SOURCES.md)
+- [Document Intelligence](design/DOCUMENT_INTELLIGENCE.md)
+- [Approvals and Autonomy](design/APPROVALS_AND_AUTONOMY.md)
+- [Networking and Communications](design/NETWORKING_AND_COMMUNICATIONS.md)
+- [Frontend Design System](design/FRONTEND_DESIGN_SYSTEM.md)
+- [Continuous monitoring](#continuous-posting-monitoring-and-rapid-preparation), defined below
+- [Cloud execution](CLOUD_DEPLOYMENT_PLAN.md)
+
+Where a section below summarizes a subsystem, the linked design is authoritative.
 
 Career Central is a comprehensive AI-assisted career workspace: discover suitable opportunities, explain fit, prepare truthful personalized applications, obtain approval, track actual outcomes, manage correspondence, prepare for interviews and improve long-term career prospects. Automate repetitive work while preserving user control over consequential decisions. Infrastructure supports these workflows; it is not their completion criterion.
 
@@ -32,10 +48,18 @@ Retain the original requirement IDs so historical tasks remain traceable.
 | CC-R16 | Provide private data management, bounded durable work, recovery, audit history, actionable notifications and eventual accessible mobile PWA delivery. |
 | CC-R17 | Mark a product workflow complete only when its user journey, failure handling, permission boundaries and relevant validation are demonstrated; code presence and infrastructure tests alone are insufficient. |
 | CC-R18 | Continuous posting monitoring and rapid preparation are core: compliant adaptive polling, trustworthy change identity/timestamps, immediate matching, durable deduplicated tasks and actionable alerts. Target latency is visible, never guaranteed. |
+| CC-R19 | Provide a configurable, versioned Career Identity interface separating verified facts, user claims, preferences and AI inferences. Every generated professional claim traces to evidence or explicit approval. No credentials in identity records. ([design](design/CAREER_IDENTITY.md)) |
+| CC-R20 | Track discovery, application preparation and submission-with-receipt as independent, separately validated capabilities per source. Prefer APIs, feeds, employer endpoints and email alerts over browser automation; respect platform terms; link aggregator listings to canonical employer postings. ([register](design/JOB_SOURCES.md)) |
+| CC-R21 | Use one approval and autonomy framework (action classes, scoped grants, expiry, revocation, audit, idempotency, receipt verification, no automatic retry of ambiguous submissions), configurable per action type, with external communications approval-based by default. ([design](design/APPROVALS_AND_AUTONOMY.md)) |
+| CC-R22 | Support professional networking: permitted contact discovery, evidence-based relationships, employer/opportunity association, approved introductions/referral requests/replies, reply detection and conversation history. LinkedIn sending is manual. ([design](design/NETWORKING_AND_COMMUNICATIONS.md)) |
+| CC-R23 | Deliver a calm, accessible, responsive frontend that separates urgent decisions from routine background activity, with reduced-motion support and a later PWA. Aesthetic inspiration only, never copied assets. ([design](design/FRONTEND_DESIGN_SYSTEM.md)) |
+| CC-R24 | Prioritize an operational single-user product over commercial infrastructure. Use minimal idle cloud cost, event-driven execution, local browser work first and quotas/cost monitoring for any cloud worker. ([ADR 0004](decisions/0004-product-vision-expansion.md), [cloud plan](CLOUD_DEPLOYMENT_PLAN.md)) |
 
 ## Functional product scope
 
 ### Job discovery and matching
+
+Sources beyond the configured ATS boards (LinkedIn, RippleMatch, Handshake, Indeed, Wellfound, USAJOBS, more employer sites and ATS platforms) are tracked per capability in the [source register](design/JOB_SOURCES.md). None of them is assumed to offer an API or to permit automated applications.
 
 Automatically collect from existing configured ATS/board sources and approved schedules. Record source successes, failures, freshness and omitted coverage. Normalize stable job identities; distinguish exact duplicates, related requisitions and possible reposts. Apply shared admission/eligibility policy consistently, retaining unknowns and reasoned exclusions. Check availability conservatively; stale or missing descriptions reduce confidence.
 
@@ -63,6 +87,8 @@ Future separately authorized autonomy follows detect → verify eligibility and 
 
 ### Application automation
 
+Authorization for every preparation and submission step follows [Approvals and Autonomy](design/APPROVALS_AND_AUTONOMY.md). Per-platform capability states are in the [source register](design/JOB_SOURCES.md).
+
 Detect supported form/platform and extract standard, conditional and employer-specific questions. Complete fields only from verified facts or reviewed answers; surface unknown/compound/legal/consent questions. Upload only the exact approved resume/document bytes. Present company, role, URL, final answers, attachments and risks in a review bound to the exact payload and expiry.
 
 Start with one approved Greenhouse application through confirmation or explicit unresolved reconciliation. Preserve HTTP 428/challenge handling and normal human authentication; never bypass security controls. Add other ATS transports individually after the same safety contract and conformance tests. Track prepared, approved, dispatched, verification-required, accepted and reconciled states separately. A sent request, upload, email or success-looking page alone is not a confirmed application.
@@ -71,9 +97,13 @@ Eventual autonomous mode is opt-in and separately authorized: allowlisted platfo
 
 ### Resume and career profile
 
+Authoritative designs: [Career Identity](design/CAREER_IDENTITY.md) for facts and preferences, and [Document Intelligence](design/DOCUMENT_INTELLIGENCE.md) for tailoring, letters, answers and artifact provenance. Integrated tailoring is not yet implemented.
+
 Reuse the canonical skills/experience inventory and provenance controls. Support multiple named resume versions, job-specific tailoring, cover letters and application statements. ATS optimization improves structure and truthful coverage; it must not add unsupported keywords as qualifications. Distinguish master facts, generated variants and approved artifacts. Preserve version history, source/fact references, content hashes and which application used which version. Edits require review; approved bytes remain immutable for their approved action.
 
 ### Email and professional networking
+
+Authoritative design: [Networking and Communications](design/NETWORKING_AND_COMMUNICATIONS.md). All sending follows [Approvals and Autonomy](design/APPROVALS_AND_AUTONOMY.md).
 
 Keep Gmail readonly sync bounded and separate from reviewed sending; preserve Outlook for future use. Support selectively redirected recruiting mail and direct recruiting mail, with provenance/recipient checks. Classify confirmations, recruiter responses, interviews and assessments; surface dates and uncertainty. Exclude unrelated account-security mail. Store minimal observation metadata separately from protected drafting context.
 
@@ -82,6 +112,8 @@ Prepare replies and personalized LinkedIn/outreach drafts in the user's saved wr
 Verification codes are supported only in a future explicitly authorized application-bound session with verified context, expiry and human control. Codes must not enter analytics, shared logs or general model prompts. If reliable provenance or supported continuation is absent, stop for manual handling. General account login/MFA handling is outside this feature.
 
 ### Career dashboard
+
+Future experience: the [Frontend Design System](design/FRONTEND_DESIGN_SYSTEM.md) (workspaces: Home, Opportunities, Applications, Approval Center, Networking, Career Identity, Career Development, Analytics, Settings), rolled out incrementally on the existing Next.js app.
 
 Evolve the existing Next.js views and canonical overview, with clear links and one recognizable application identity. Show ranked recommendations, application pipeline, pending reviews, confirmations/conflicts, interview rounds, assessments, tasks/deadlines and next actions. Display source freshness and worker/mail health without treating recorded health as execution authority.
 

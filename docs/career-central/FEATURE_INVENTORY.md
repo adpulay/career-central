@@ -2,7 +2,11 @@
 
 Source audit: 2026-11-10. This inventory classifies the intended product capability, not merely its helper code. Source and historical tests were inspected; no product tests, live scans, browser applications or mailbox requests were run for this documentation audit. Paths are evidence entry points, not assertions of universal provider compatibility. [Product requirements](PRODUCT.md) · [delivery roadmap](ROADMAP.md).
 
-## Latest local slice — 2026-11-10
+## Latest update — 2026-11-11
+
+The local monitor now uses per-employer storage (real data migrated and validated), a gated scheduler with health states, a paged dashboard and a configured five-employer pilot. Four of the five live baselines are established; recurring monitoring is not authorized ([STATUS](STATUS.md)). The expanded vision added F60–F79 below as **planned or partial** capabilities: none became operational through documentation, and each row's state reflects inspected repository evidence only.
+
+## Earlier local slice — 2026-11-10
 
 [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) now implement a minimum shared
 shortlist, durable source cycle, dashboard alerts/decisions and local preparation
@@ -113,7 +117,7 @@ Execution authority is independent of maturity. “Approval required” means ex
 
 | ID / capability | State | Evidence | Remaining product acceptance / execution boundary |
 |---|---|---|---|
-| F55 Continuous per-employer monitoring | P | [scan worker](../../web/scripts/scheduled-jobs-runner.mjs), [providers](../../providers/_registry.mjs) | Local priority/adaptive source cycle now fixture/UI validated; ongoing scheduler integration and live source acceptance pending. Desired 5/15/30–60 minute cadence requires source budgets and worker availability; no recurring activation. |
+| F55 Continuous per-employer monitoring | P (local pilot configured, not activated) | [job monitor](../../lib/career-central/job-monitor.mjs), [per-source store](../../lib/career-central/monitor-store.mjs), [scheduler](../../lib/career-central/monitor-scheduler.mjs), [runbook](../JOB_MONITOR.md) | Per-employer storage, gated tick, expiring authorization, adaptive 30→120 minute cadence and health states are validated in offline and simulated 7-day tests. Live baselines exist for 4 of 5 pilot employers (Stripe pending). Recurring operation needs separate approval; cloud execution is CC-017. |
 | F56 Publication/change lifecycle | P | [scan history](../../scan.mjs), [repost detection](../../detect-reposts.mjs), [listing identity](../../listing-fingerprint.mjs) | Durable posting versions, separate timestamps/provenance, duplicates, updates, related/reappearance and completeness-based expiry are locally implemented; live semantics remain pending. |
 | F57 Rapid evaluation/preparation queue | P (local proposals validated) | [ranking](../../lib/applications/discovery.mjs), [application planning](../../lib/applications/greenhouse.mjs) | Durable local matching/shortlist/alert/proposal path implemented. Employer form execution and full approval-task lifecycle remain separate. No browser/upload/submit authority from a match. |
 | F58 High-priority alert lifecycle | P (local dashboard validated) | [agent inbox](../../agent-inbox.mjs), [overview](../../web/src/app/career-central/page.tsx) | Deduplicated local alerts, readiness and dismiss/pause dispositions implemented. Quiet hours/snooze and rich delivery lifecycle remain partial. Desktop/push/email are later gated channels. |
@@ -124,3 +128,30 @@ Execution authority is independent of maturity. “Approval required” means ex
 The original audit already proposed much of the broad vision, but PRODUCT/ROADMAP omitted actionable resume/versioning, outreach, DSA practice, readiness, certification/projects/path comparison, notification and PWA milestones. They over-emphasized foundational infrastructure and Outlook sequencing. The new roadmap exposes these product gaps, preserves milestone history, records Gmail round-trip acceptance and makes discovery quality the next bounded deliverable. No inspection establishes that every listed helper is integrated, live reliable or authorized for external execution.
 
 Continuous monitoring and rapid preparation are explicitly core requirements, not a synonym for running the existing scanner periodically. [CC-016](tasks/CC-016.md) defines the smallest useful implementation and authorization boundary.
+
+## Expanded vision capabilities — CC-R19–CC-R24 (added 2026-11-11)
+
+Definitions live in the linked designs. States follow the rules above; "N" rows are not implemented.
+
+| ID / capability | State | Evidence | Remaining product acceptance / execution boundary |
+|---|---|---|---|
+| F60 Versioned Career Identity interface | N (interface); source files exist | [design](design/CAREER_IDENTITY.md), [career profile](../../career-profile.mjs) | I1 read adapter and conflict report; first consumer is the CC-017 eligibility projection. No data migration. |
+| F61 Claim classes and provenance | P | `verified` flags in the private application profile, [story provenance](../../story-provenance-check.mjs), [profile contract](../../lib/career-profile.mjs) | Unified `verified_fact/user_claim/preference/ai_inference/unknown` classes and generated-claim traceability are absent. |
+| F62 Connected-account references (no tokens in identity) | P | [protected storage](../../lib/email/PROTECTED_STORAGE.md) | Tokens are already kept apart from profile data; the identity-level account reference model is planned. |
+| F63 Per-source capability register | P (documented) | [source register](design/JOB_SOURCES.md) | Separate D/Prep/Sub states are documented; automated state tracking and acceptance records are planned. |
+| F64 LinkedIn job discovery via alert emails | P | [linkedin import](../../linkedin-import.mjs), [LinkedIn URL rules](../../lib/linkedin-url.mjs) | Manual paste import only; no account or API access. Gmail-label ingestion is planned. LinkedIn preparation and submission are not automated. |
+| F65 USAJOBS API discovery | N | [source register](design/JOB_SOURCES.md) | Needs an API key with user approval and a provider adapter; submission stays manual. |
+| F66 Gmail-label job-alert ingestion | N | [mail analyzer](../../lib/email/application-mail.mjs) | Label-scoped bounded reads, untrusted-content parsing, employer confirmation. |
+| F67 RippleMatch, Handshake, Indeed, Wellfound discovery | N | [source register](design/JOB_SOURCES.md), aggregator identity in [url-key](../../url-key.mjs) | Authorized integrations or email alerts per platform; never automated applications by assumption. |
+| F68 Cross-source canonical linking | P | [url-key](../../url-key.mjs), [listing fingerprints](../../listing-fingerprint.mjs), AGENTS.md aggregator rule | Monitor and scan identities need one linking contract that records the first-seen source. |
+| F69 Unified grant model and audit | N (mechanisms exist separately) | [approvals design](design/APPROVALS_AND_AUTONOMY.md), [reviewed submission](../../lib/applications/reviewed-submission.mjs), [monitor authorization](../../lib/career-central/monitor-scheduler.mjs) | Migrate each mechanism only with equal-or-stricter checks and regression tests. |
+| F70 Per-action-type autonomy configuration | N | [approvals design](design/APPROVALS_AND_AUTONOMY.md) | Defaults are documented; configuration may only tighten without a new authorization. |
+| F71 Approval Center workspace | N (partial inbox F51) | [agent inbox](../../agent-inbox.mjs), monitor preparation proposals | One prioritized decision list with exact payloads, expiry and no bulk class-C approval. |
+| F72 Contact model and opportunity association | P | [contact lookup](../../contact-lookup.mjs), [LinkedIn join](../../linkedin-join.mjs) | Evidence-based relationships; employer/opportunity links; no invented relationships. |
+| F73 Recruiter introduction and referral-request drafts | P | [contacto](../../modes/contacto.md), [email mode](../../modes/email.md) | Identity-backed drafts with Approval Center send; LinkedIn manual-send fallback. |
+| F74 Conversation history and verified-event state updates | N | [networking design](design/NETWORKING_AND_COMMUNICATIONS.md) | Depends on P3 real classification and owner-write contracts. |
+| F75 Calm design-system tokens and components | N | [frontend design](design/FRONTEND_DESIGN_SYSTEM.md) | Scoped to Career Central routes; contrast, reduced-motion and viewport tests. |
+| F76 Workspace information architecture | N | [frontend design](design/FRONTEND_DESIGN_SYSTEM.md#workspaces) | Incremental; existing routes keep working. |
+| F77 Attention model and notification budget | N (partial F51/F58) | [frontend design](design/FRONTEND_DESIGN_SYSTEM.md#attention-model) | Urgent versus routine separation, quiet hours, coalescing and snooze. |
+| F78 Ephemeral cloud browser workers | N | [cloud plan §16](CLOUD_DEPLOYMENT_PLAN.md#16-browser-execution-model) | Only after measured need, a cost model and an approved session/credential design (C6). |
+| F79 Worker quotas and cost/execution monitoring | N | [cloud plan](CLOUD_DEPLOYMENT_PLAN.md) | Budgets, per-task timeouts and metrics before any cloud worker runs. |

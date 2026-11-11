@@ -1,6 +1,6 @@
 # ADR 0003 — Cloud monitoring first; S3 partition documents plus a DynamoDB control table
 
-Date: 2026-11-11. Status: proposed (the user's approval is required before any provisioning). Refines the stage order of [ADR 0001](0001-development-and-deployment.md) and [audit §15.8](../../architecture/career-central-audit.md#158-incremental-hybrid-deployment-plan-and-acceptance-gates); it does not change their security or worker principles.
+Date: 2026-11-11. Status: accepted direction. The user's agreed product sequence ([ADR 0004](0004-product-vision-expansion.md)) places minimal always-on AWS monitoring at step 3. Every provisioning action still requires the explicit approvals in the plan's §15. Refines the stage order of [ADR 0001](0001-development-and-deployment.md) and [audit §15.8](../../architecture/career-central-audit.md#158-incremental-hybrid-deployment-plan-and-acceptance-gates); it does not change their security or worker principles.
 
 Context: continuous employer monitoring is the highest-value capability that needs the PC to be off. It uses only public ATS feeds, needs no credentials and no inbound endpoint, and is already implemented locally with leases, backoff, deduplication, per-source partitions and a gated scheduler. The earlier plan put a read-only hosted dashboard first, which requires authentication, an API and a data split before delivering unattended value.
 

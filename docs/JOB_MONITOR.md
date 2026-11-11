@@ -115,7 +115,7 @@ npm run monitor -- authorize-recurring --source databricks,palantir,stripe,scale
 
 ```bat
 :: 3. Windows Task Scheduler trigger (every 10 minutes, runs while the user is logged on)
-schtasks /Create /TN "CareerCentral\MonitorTick" /SC MINUTE /MO 10 /F /TR "wsl.exe -d Ubuntu -u root -- /home/adam/JobScraper/career-ops/scripts/job-monitor-tick.sh"
+schtasks /Create /TN "CareerCentral\MonitorTick" /SC MINUTE /MO 10 /F /TR "wsl.exe -d <Distro> -u <user> -- <absolute-repo-path>/scripts/job-monitor-tick.sh"
 ```
 
 `scripts/job-monitor-tick.sh` runs one tick and appends a sanitized JSON line to `data/logs/job-monitor-tick.log` (0600, rotated at 5 MiB). Without an unexpired authorization it exits 1 with `MONITOR_RECURRING_NOT_AUTHORIZED` and polls nothing; this was verified on a copy of the data.

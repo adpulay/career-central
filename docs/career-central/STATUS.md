@@ -1,5 +1,26 @@
 # Verified project state
 
+## Product vision and documentation alignment — 2026-11-11
+
+This was a documentation-only update; no runtime behavior changed. Added the [ADR 0004](decisions/0004-product-vision-expansion.md) product direction (single-user first, with commercialization out of the near-term roadmap), requirements CC-R19–CC-R24, and authoritative designs in `design/`:
+- [Career Identity](design/CAREER_IDENTITY.md)
+- [Job Sources](design/JOB_SOURCES.md)
+- [Document Intelligence](design/DOCUMENT_INTELLIGENCE.md)
+- [Approvals and Autonomy](design/APPROVALS_AND_AUTONOMY.md)
+- [Networking and Communications](design/NETWORKING_AND_COMMUNICATIONS.md)
+- [Frontend Design System](design/FRONTEND_DESIGN_SYSTEM.md)
+
+It also added the roadmap's 10-step sequence with milestones P1c, P5a and P11, inventory rows F60–F79 (all planned or partial), and the cloud plan's browser execution model (§16, conditional stage C6).
+
+Verified monitoring state when the docs were written:
+- Local per-employer store active since migration commit `37b8c6cd`.
+- Pilot preparation commits `5f9b6077` and `9c32f8b8`.
+- Live baselines: Cloudflare (earlier), Palantir 304, Scale AI 169, and Databricks 912 (a retry succeeded after the response cap was raised).
+- Stripe: still pending, recorded as `enrichment_response_too_large`. The inline-offices fix is committed, and a single retry is scheduled after its backoff.
+- Reviewable postings: 140 across all configured sources, with two potentially eligible (Databricks new-grad). This supersedes the earlier 133 figure.
+- Recurring monitoring not authorized; no Windows task installed.
+- 416 related regressions and three browser suites passed at `9c32f8b8`.
+
 ## Local recurring-monitoring pilot configured (not activated) — 2026-11-11
 
 Configured Databricks (Greenhouse), Palantir (Lever), Stripe (Greenhouse) and Scale AI (Greenhouse) at 30 minutes, and moved Cloudflare to 30 minutes. Datadog and MongoDB stay configured, outside the pilot. The configured-source cap was raised from 5 to 8, since storage is per source. A pre-pilot backup is at `data/backups/job-monitor-prepilot-20261111T005246Z/` (SHA256SUMS verified).

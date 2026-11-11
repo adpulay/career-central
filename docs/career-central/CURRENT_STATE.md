@@ -1,5 +1,7 @@
 # Current state entry point
 
+Product direction (2026-11-11): see [PRODUCT](PRODUCT.md), [ADR 0004](decisions/0004-product-vision-expansion.md) and the `design/` documents. These are plans, not implemented features.
+
 Latest (2026-11-11): monitoring storage migrated to per-employer partitions and validated (backup and rollback retained); the scheduler is validated by simulation; employer coverage reviewed ([EMPLOYER_COVERAGE](EMPLOYER_COVERAGE.md)); cloud plan proposed ([CLOUD_DEPLOYMENT_PLAN](CLOUD_DEPLOYMENT_PLAN.md), [CC-017](tasks/CC-017.md)). No recurring monitoring, cloud resource, email or application action is active.
 
 Current continuation: [CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) minimum

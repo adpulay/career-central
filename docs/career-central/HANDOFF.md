@@ -1,5 +1,16 @@
 # Latest handoff
 
+## Product vision documented — 2026-11-11
+
+Start here for product direction: [PRODUCT](PRODUCT.md) (motivation, scope, CC-R19–R24), then the subsystem designs linked from it, [ADR 0004](decisions/0004-product-vision-expansion.md) and the [roadmap's agreed sequence](ROADMAP.md#agreed-development-sequence-2026-11-11).
+
+Immediate engineering priority is unchanged:
+1. Finish the local pilot: the Stripe baseline, then activation approval.
+2. [CC-017](tasks/CC-017.md) C0.
+3. C1 after the deployment approvals.
+
+Design work (identity I1 spec, frontend tokens) may proceed in parallel without changing data contracts. Open questions are listed in each design document; none blocks the next step.
+
 ## Recurring-monitoring pilot ready for activation approval — 2026-11-11
 
 The five pilot sources are configured at 30 minutes, with Palantir and Scale AI baselined. Databricks and Stripe baselines are pending after a safe failure; the fixes are in. Eligibility, deduplication, scheduler recovery and the dashboard were verified (see [STATUS](STATUS.md)).

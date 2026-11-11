@@ -10,4 +10,6 @@ Reuse providers, filters, document tools, application ledger/guards, email trans
 
 Consequences: preserve historical audit M4–M8 proposals with an explicit roadmap crosswalk. More ATS, document personalization, unified dashboard, networking, interview/learning and analytics remain visible planned work. Autonomy and PWA/cloud are later separately gated; cloud does not require autonomy. No new runtime, recurring polling, mailbox/application action, notification delivery, paid dependency, provisioning or push is authorized by this planning decision. ADR 0001's architecture direction remains unchanged.
 
+Later refinement (2026-11-11): [ADR 0003](0003-cloud-monitoring-first.md) and [ADR 0004](0004-product-vision-expansion.md) move a *minimal* cloud monitoring stage earlier because unattended monitoring needs the PC off. The cloud-deferral guidance above still applies to broad infrastructure; this ADR's other decisions are unchanged.
+
 Evidence: [PRODUCT](../PRODUCT.md), [ROADMAP](../ROADMAP.md), [CC-014](../tasks/CC-014.md), [CC-015](../tasks/CC-015.md), [CC-016](../tasks/CC-016.md).

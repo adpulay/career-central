@@ -2,6 +2,8 @@
 
 Date: 2026-11-11. Status: **proposed plan; nothing provisioned.** Supersedes the *ordering* of [audit §15.8](../architecture/career-central-audit.md#158-incremental-hybrid-deployment-plan-and-acceptance-gates). Unattended monitoring moves ahead of a hosted dashboard, recorded in [ADR 0003](decisions/0003-cloud-monitoring-first.md). The security, authentication, worker-protocol and outbound-only principles of audit §15.4–15.6 remain in force. The first milestone is specified in [CC-017](tasks/CC-017.md).
 
+Product context: the [product vision](PRODUCT.md) and [ADR 0004](decisions/0004-product-vision-expansion.md) (single-user first; no billing, organizations or multi-tenancy in the near-term plan). Current pilot state: [STATUS](STATUS.md).
+
 Goal: the smallest reliable, secure, cost-controlled AWS system that runs employer monitoring while the PC is off. It must extend later to a hosted dashboard, hybrid browser workers and approved automation without a rewrite.
 
 ## 1. Readiness assessment (inspected 2026-11-11)
@@ -58,7 +60,8 @@ The PC never accepts inbound connections. Cloud components own unattended monito
 | API Gateway HTTP API | **C3** | Authenticated dashboard/worker API. | Lambda function URLs (weaker authorizer story). | ~$1/M requests. |
 | CloudFront + S3 static app | **C3** | Hosted dashboard shell. | Amplify SSR (Next 16 support unverified). | Usually within the free allowance. |
 | Cognito user pool | **C3** | Owner login with MFA; separate worker client with narrow scopes. | Self-built auth (rejected). | Free for one user (verify plan). |
-| ECS/Fargate | **Not planned** | Only if a long-running cloud worker is ever justified. Browser work stays local. | — | Always-on cost; avoided. |
+| ECS/Fargate | **Evaluate in C6 only**, as short-lived tasks | Ephemeral cloud browser workers, if measured local-worker unavailability blocks valuable preparation (§16). Authenticated employer sessions stay local by default. | A Lambda container image with headless Chromium for short, stateless page work; local Chromium (default) | Per-second billing with a 1-minute minimum per task; no always-on service. |
+| EC2 | **Not planned** | Only if measured, sustained browser workload makes it cheaper than ephemeral tasks | Fargate tasks; Lambda | Always-on cost and patching; justify with measurements first. |
 | VPC / NAT Gateway | **Avoid** | Nothing private to reach; Lambdas use public AWS endpoints. | — | A NAT Gateway is ~$33/mo plus data. |
 | Bedrock (AI matching) | **Later, opt-in** | Semantic matching for postings that already pass deterministic filters. | Local/agent evaluation (current). | Haiku-class ~$1/M input, $5/M output tokens (verify). Capped by budget. |
 
@@ -221,6 +224,7 @@ Budgets alert; they do not stop spend. The runbook action at 100% of budget is t
 | **C3** | Cognito, API Gateway, Lambda API, static dashboard (read-only first). | Phone/desktop access with the PC off. | Remove distribution; data unaffected. |
 | **C4** | Outbound local browser worker, task records, approvals, receipts, emergency stop. | Approved preparation/submission coordination. | Kill switches; worker revocation. |
 | **C5** | Email-driven updates, mobile notifications, optional AI matching, cloud mail token custody. | Each separately. | Per-feature flags. |
+| **C6 (conditional)** | Ephemeral cloud browser workers for unauthenticated or approved preparation steps (§16). | Only after measured need, a cost model and an approved session/credential design. | Disable the worker type; tasks fall back to the local worker. |
 
 ## 14. First cloud milestone
 
@@ -239,3 +243,26 @@ Budgets alert; they do not stop spend. The runbook action at 100% of budget is t
 9. Alert delivery for C1: local pull only (recommended), or a separately approved channel.
 10. The first `cdk deploy` to dev, and later promotion to prod.
 11. Later: SQS (C2), hosted dashboard (C3), worker enrollment (C4), Bedrock and cloud mail (C5), each with its own budget.
+
+## 16. Browser execution model
+
+The hybrid execution model is unchanged: serverless monitoring and orchestration in the cloud, and browser work local first.
+
+| Workload | Default placement | When to move | Constraints |
+|---|---|---|---|
+| Feed polling, normalization, deduplication, eligibility, ranking | Lambda (C1/C2) | — | API-first; no browser |
+| Authenticated employer sessions, account logins, CAPTCHA or human-verification handoffs, résumé uploads | **Local Chromium worker** (C4, outbound-only) | Not planned for the cloud while credentials and human verification are involved | Credentials and cookies never leave the local vault; human handoff for challenges |
+| Unauthenticated page reads (JD capture or liveness when no API exists), form-schema inspection | Local first; candidate for an **ephemeral cloud browser** (C6) | When the local worker's offline time measurably delays high-priority preparation | A Lambda container with Chromium (bounded duration and memory) or a short-lived Fargate task; per-task timeout, quota and cost metric |
+| Long or heavy browser sessions | Local | EC2 only if sustained measured load makes it cheaper than ephemeral tasks | Justify with a cost comparison |
+
+Common requirements for any cloud browser worker:
+- Worker leases and idempotency keys, as for the monitor.
+- Per-task timeouts and safe cancellation at defined boundaries.
+- Concurrency and daily quotas.
+- Cost and execution metrics with budget alarms.
+- Outbound-only networking without a NAT Gateway unless a private resource requires one.
+- No persisted cookies or credentials.
+- Results stored as artifacts in S3 with hashes.
+- Every external effect still governed by the [unified approval framework](design/APPROVALS_AND_AUTONOMY.md).
+
+SQS is introduced only when distributed durable task execution needs it (C2 for polling fan-out, C4 for worker wake-ups), never as an empty day-one component.
