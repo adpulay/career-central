@@ -23,7 +23,7 @@ Same legend as the [feature inventory](../FEATURE_INVENTORY.md#status-and-eviden
 
 | Source | D (discovery) | Prep | Sub | Evidence and notes |
 |---|---|---|---|---|
-| Greenhouse | **V** (local live monitor baselines: Cloudflare, Databricks, Scale AI; Datadog/MongoDB earlier) | P (schema inspection, verified field filling on one live form) | P (narrow reviewed path; earlier live attempt hit HTTP 428 verification, no confirmed receipt) | [monitor](../../JOB_MONITOR.md), [application-automation](../../architecture/application-automation.md). Stripe discovery baseline pending. |
+| Greenhouse | **V** (local live monitor baselines: Cloudflare, Databricks, Scale AI, Stripe; Datadog/MongoDB earlier) | P (schema inspection, verified field filling on one live form) | P (narrow reviewed path; earlier live attempt hit HTTP 428 verification, no confirmed receipt) | [monitor](../../JOB_MONITOR.md), [application-automation](../../architecture/application-automation.md). Inline `offices[]` enrichment avoids the oversized `/offices` download (Stripe). |
 | Lever | **V** (local live monitor baseline: Palantir) | N | N | Public postings API |
 | Ashby | I (provider and monitor adapter; no monitor baseline yet) | N | N | Public posting feed |
 | Workday | I (tenant provider) | N | N | Tenant adapters likely needed for preparation |

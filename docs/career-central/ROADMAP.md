@@ -49,8 +49,8 @@ Logical dependencies, not a mandate to serialize all work. Independent design an
 
 | # | Step | Milestones / tasks | State (evidence in [STATUS](STATUS.md)) |
 |---|---|---|---|
-| 1 | Complete and validate the local monitoring pilot | P1b, [CC-016](tasks/CC-016.md) | In progress. Store migrated; 4 of 5 pilot baselines established; recurring monitoring not authorized. |
-| 2 | Storage/interface groundwork | [CC-017](tasks/CC-017.md) C0 | Planned |
+| 1 | Complete and validate the local monitoring pilot | P1b, [CC-016](tasks/CC-016.md) | Ready for activation approval: store migrated, 5 of 5 baselines established, scheduler and task setup validated; recurring monitoring not authorized. |
+| 2 | Storage/interface groundwork | [CC-017](tasks/CC-017.md) C0 | Implemented, validated and integrated (2026-11-11) |
 | 3 | Minimal always-on AWS monitoring | CC-017 C1 ([plan](CLOUD_DEPLOYMENT_PLAN.md)) | Planned; provisioning requires approval |
 | 4 | Expand approved discovery integrations | P1c ([source register](design/JOB_SOURCES.md)) | Planned |
 | 5 | Verified identity and document tailoring | P5a, P5 | Planned |

@@ -1,5 +1,12 @@
 # Latest handoff
 
+## Pilot ready for authorization; C0 integrated; C1 next — 2026-11-11
+
+- **Main:** `career-central/pre-m3d-stabilization` at `3b45c549` includes C0 (storage port, eligibility projection, telemetry, handler) and the C1 preparation (cloud-shaped store with authoritative `load()`, distributed leases, concurrency tests). See [STATUS](STATUS.md) and [CC-017](tasks/CC-017.md).
+- **Pilot:** all five baselines are established. The activation package (authorization plus the `Register-ScheduledTask` setup) is in the [runbook](../JOB_MONITOR.md#pilot-databricks-palantir-stripe-scale-ai-cloudflare-configured-2026-11-11-not-activated) and **requires the user's approval**. Nothing is activated.
+- **Next engineering after activation approval:** the CC-017 C1 steps that need no resources, then the approvals in the [cloud plan §15](CLOUD_DEPLOYMENT_PLAN.md#15-decisions-requiring-your-approval-before-any-deployment): AWS SDK dependencies, `infra/` (CDK), account, region, budget, OIDC.
+- **Smallest real-cloud test:** in a dev account, one fixture source driven through the deployed handler, proving baseline quiet, one alert for a controlled change, no duplicate on repeat, and a 412 on a stale concurrent write.
+
 ## Product vision documented — 2026-11-11
 
 Start here for product direction: [PRODUCT](PRODUCT.md) (motivation, scope, CC-R19–R24), then the subsystem designs linked from it, [ADR 0004](decisions/0004-product-vision-expansion.md) and the [roadmap's agreed sequence](ROADMAP.md#agreed-development-sequence-2026-11-11).

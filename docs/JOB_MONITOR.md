@@ -89,7 +89,7 @@ Activation checklist (each step needs the user's explicit approval): apply the s
 
 Configured locally at a 30-minute target. Datadog and MongoDB stay configured (history preserved) but are outside the pilot authorization, so `tick` never polls them. At most eight sources may be configured.
 
-**First-seen baselines.** Palantir (304 postings) and Scale AI (169) were established by one bounded `first-poll` each, quietly: every posting is `baseline`, with no alerts or proposals. Cloudflare already had a live baseline. Databricks and Stripe failed safely, with no checkpoint, no postings and exponential backoff:
+**First-seen baselines — all five established (2026-11-11).** Cloudflare (earlier live baseline), Palantir (304 postings), Scale AI (169), Databricks (912, on a retry after the cap fix) and Stripe (785, on a retry after the inline-offices fix). Each was one bounded `first-poll`, quiet (every posting `baseline`, 0 alerts, 0 proposals), with first-seen equal to the live checkpoint. Stripe's 785 locations are complete (none work-model-only or empty). The earlier failures, both safe (no checkpoint, no postings, backoff respected):
 - **Databricks:** most likely the old 8 MiB response cap. It is the largest board, and the failure came within about 1 s. The cap is now 24 MiB.
 - **Stripe:** its optional `/offices` lookup timed out after the job list loaded. A cycle with a failed lookup is deliberately failed, because a partial snapshot would change remote postings' locations and trigger false "updated" alerts.
 

@@ -1,5 +1,20 @@
 # Verified project state
 
+## Five-employer baselines complete; CC-017 C0 integrated — 2026-11-11
+
+- **Stripe:** its single scheduled retry ran at 23:27:42 UTC and succeeded: 785 postings, all `baseline`, first-seen equal to the live checkpoint (ETag recorded), 0 alerts and 0 proposals.
+  - Locations are complete: no work-model-only or empty locations.
+  - The retry used the inline `offices[]` path, which a same-moment live comparison on Cloudflare had proven identical to the `/offices` endpoint (478/478).
+- **All five pilot baselines:** Cloudflare 491, Palantir 304, Scale AI 169, Databricks 912, Stripe 785. Datadog (421) and MongoDB (395) stay configured, outside the pilot.
+- **Partition sizes:** the largest is Databricks at 1.64 MiB compact, 55 % of the per-source budget.
+- **First-seen preserved:** unchanged against the pre-pilot backup for Cloudflare, Datadog and MongoDB, and a single baseline time for each new employer.
+- **Integration:** CC-017 C0 and the C1 preparation were fast-forwarded into `career-central/pre-m3d-stabilization`, from `a5848d68` to `3b45c549` (7 commits, no merge commit, no history rewrite). The temporary worktree was removed after verification; branch `career-central/cc-017-c0` is kept.
+- **Validation in the integrated checkout:**
+  - 460 related Node tests passed (storage contract across file, memory and cloud-shaped stores; cloud concurrency; scheduler including the simulated 7-day run; privacy/redaction; eligibility equivalence), plus lint, typecheck, production build and the job-monitor, job-monitor-cache and career-central browser suites.
+  - Read-only comparison: the pre-integration and integrated code produce an identical paginated dashboard view and health for all 181 reviewable postings.
+  - Unchanged: application jobs/events, the three email records, profile, policy, CV, tracker and `config/profile.yml`.
+- **State:** recurring monitoring is not authorized and no scheduled task is installed. AWS: nothing provisioned, and the cloud adapter has been tested only against fake clients.
+
 ## Product vision and documentation alignment — 2026-11-11
 
 This was a documentation-only update; no runtime behavior changed. Added the [ADR 0004](decisions/0004-product-vision-expansion.md) product direction (single-user first, with commercialization out of the near-term roadmap), requirements CC-R19–CC-R24, and authoritative designs in `design/`:
