@@ -8,6 +8,7 @@ import os from 'node:os';
 import {configureSources, pollSource, readMonitor, monitorView} from '../lib/career-central/job-monitor.mjs';
 import {fileMonitorStore} from '../lib/career-central/monitor-store.mjs';
 import {memoryMonitorStore} from '../lib/career-central/monitor-memory-store.mjs';
+import {createCloudMonitorStore, memoryObjectStore, memoryTable} from '../lib/career-central/cloud-monitor-store.mjs';
 
 const now = Date.parse('2026-11-10T12:00:00Z'), hour = 3600000;
 const src = id => ({id, company: `Fictional ${id}`, provider: 'greenhouse', board: id, intervalMinutes: 5});
@@ -21,6 +22,8 @@ const fail = code => Object.assign(Error(code), {code});
 const STORES = {
   file: () => {const root = fs.mkdtempSync(path.join(os.tmpdir(), 'monitor-contract-')); return {store: fileMonitorStore(root), cleanup: () => fs.rmSync(root, {recursive: true, force: true}), root};},
   memory: () => ({store: memoryMonitorStore(), cleanup: () => {}}),
+  // S3/DynamoDB semantics over in-memory fakes: no SDK, no credentials, no resources.
+  cloud: () => ({store: createCloudMonitorStore({objects: memoryObjectStore(), table: memoryTable()}), cleanup: () => {}}),
 };
 // Simulates a process crash right after the Nth updateSource commit: the call
 // committed, then nothing else in that "process" can write until restart().
@@ -28,7 +31,7 @@ const crashAfterCommit = (store, shouldCrash) => {
   let down = false, calls = 0;
   const guard = () => {if (down) throw fail('SIMULATED_CRASH');};
   return {...store, stats: store.stats, testHooks: store.testHooks,
-    readAll: () => store.readAll(), backend: () => store.backend(), acquireTickLock: () => store.acquireTickLock(),
+    readAll: () => store.readAll(), backend: () => store.backend(), acquireTickLock: () => store.acquireTickLock(), refresh: () => store.refresh?.(),
     updateAll: async (...args) => {guard(); return store.updateAll(...args);},
     updateSource: async (...args) => {guard(); const result = await store.updateSource(...args); if (shouldCrash(++calls)) {down = true; throw fail('SIMULATED_CRASH');} return result;},
     restart() {down = false;}};
@@ -66,7 +69,8 @@ for (const [kind, make] of Object.entries(STORES)) {
   contract('a stale writer is rejected with MONITOR_STORE_CONFLICT and nothing is half-written', async ({store}) => {
     await configureSources(store, [src('alpha')]); await poll(store, 'alpha', [job('alpha', '1')], now);
     const before = readMonitor(store);
-    await assert.rejects(store.updateSource('alpha', scoped => {store.testHooks.externalWrite('alpha'); scoped.sources.alpha.paused = true;}), {code: 'MONITOR_STORE_CONFLICT'});
+    await assert.rejects(store.updateSource('alpha', async scoped => {await store.testHooks.externalWrite('alpha'); scoped.sources.alpha.paused = true;}), {code: 'MONITOR_STORE_CONFLICT'});
+    await store.refresh?.();
     assert.equal(readMonitor(store).sources.alpha.paused ?? false, before.sources.alpha.paused ?? false);
     assert.deepEqual(readMonitor(store).postings, before.postings);
   });
@@ -109,8 +113,9 @@ for (const [kind, make] of Object.entries(STORES)) {
     if (kind === 'file') {
       const file = path.join(root, 'data/job-monitor/sources/alpha.json'), part = JSON.parse(fs.readFileSync(file));
       fs.writeFileSync(file, JSON.stringify({...part, schemaVersion: 999}), {mode: 0o600});
-    } else store.testHooks.corrupt('alpha');
-    assert.throws(() => readMonitor(store), {code: 'MONITOR_STATE_INVALID'});
+    } else await store.testHooks.corrupt('alpha');
+    if (store.refresh) await assert.rejects(store.refresh(), {code: 'MONITOR_STATE_INVALID'});
+    else assert.throws(() => readMonitor(store), {code: 'MONITOR_STATE_INVALID'});
     await assert.rejects(store.updateSource('alpha', () => {}), {code: 'MONITOR_STATE_INVALID'});
   });
 }
@@ -125,4 +130,27 @@ test('[memory store] crash between partition write and control release (split-st
   assert.equal(crashed.state, 'failed'); assert.equal(Object.keys(readMonitor(store).alerts).length, 1);
   const replay = await poll(store, 'alpha', [job('alpha', '1')], now + 3 * hour);
   assert.equal(replay.alerts, 0, 'replay finds the posting already published'); assert.equal(Object.keys(readMonitor(store).alerts).length, 1);
+});
+
+test('[cloud store] crash between partition PUT and control update (S3 then DynamoDB window) is replay-safe', async () => {
+  let crashOnce = false;
+  const objects = memoryObjectStore({afterPut: () => {if (crashOnce) {crashOnce = false; throw fail('SIMULATED_CRASH');}}});
+  const store = createCloudMonitorStore({objects, table: memoryTable()});
+  await configureSources(store, [src('alpha')]);
+  await poll(store, 'alpha', [], now); crashOnce = true;
+  assert.equal((await poll(store, 'alpha', [job('alpha', '1')], now + hour)).state, 'failed');
+  await store.refresh();
+  assert.equal(Object.keys(readMonitor(store).alerts).length, 1, 'partition (posting + alert) committed before the crash');
+  assert.equal((await poll(store, 'alpha', [job('alpha', '1')], now + 3 * hour)).alerts, 0);
+  assert.equal(Object.keys(readMonitor(store).alerts).length, 1);
+});
+test('[cloud store] unchanged snapshots make zero object PUTs (S3 cost model)', async () => {
+  let puts = 0;
+  const store = createCloudMonitorStore({objects: memoryObjectStore({afterPut: () => {puts++;}}), table: memoryTable()});
+  await configureSources(store, [src('alpha')]);
+  const jobs = [job('alpha', '1')];
+  await poll(store, 'alpha', jobs, now); await poll(store, 'alpha', jobs, now + hour);
+  const before = puts;
+  for (let n = 2; n < 52; n++) await poll(store, 'alpha', jobs, now + n * hour);
+  assert.equal(puts - before, 0, '50 unchanged polls: no partition PUT');
 });

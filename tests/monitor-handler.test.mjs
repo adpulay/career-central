@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureSources, readMonitor} from '../lib/career-central/job-monitor.mjs';
 import {memoryMonitorStore} from '../lib/career-central/monitor-memory-store.mjs';
+import {createCloudMonitorStore, memoryObjectStore, memoryTable} from '../lib/career-central/cloud-monitor-store.mjs';
 import {authorizeRecurring} from '../lib/career-central/monitor-scheduler.mjs';
 import {buildEligibilityProjection, contextFromProjection} from '../lib/career-central/eligibility-projection.mjs';
 import {createMonitorHandler} from '../lib/career-central/monitor-handler.mjs';
@@ -87,4 +88,24 @@ test('logLine keeps only allowlisted, validated fields', () => {
   assert.deepEqual(record, {level: 'info', event: 'source_cycle', correlationId: 'tick-1', state: 'healthy', health: 'ok_changes', counts: {new: 2}, durationMs: 13});
   const metrics = tickMetrics({results: {a: {state: 'healthy', new: 1, updated: 2, alerts: 1}, b: {state: 'failed', errorCategory: 'rate_limit'}}, durationMs: 5});
   assert.equal(metrics.NewOrChangedPostings, 3); assert.equal(metrics.RateLimited, 1); assert.equal(metrics.AlertsCreated, 1);
+});
+
+test('dev-only fixture sources drive a controlled change through the cloud-shaped store; refused outside dev', async () => {
+  const projection = buildEligibilityProjection(fullContext, {}, {now});
+  const store = createCloudMonitorStore({objects: memoryObjectStore(), table: memoryTable(), ledgerJobs: contextFromProjection(projection).ledgerJobs});
+  await configureSources(store, [src('alpha')]); await authorizeRecurring(store, {sourceIds: ['alpha'], hours: 24, now});
+  let fixture = [job('alpha', '1')], liveCalls = 0, clockNow = now;
+  const make = environment => createMonitorHandler({store, loadProjection: async () => projection, authorizeLiveRead: true, environment, clock: () => clockNow, log: () => {},
+    fetchSnapshot: async () => {liveCalls++; return {jobs: [], complete: true};}, fixtureSources: {alpha: async () => ({jobs: structuredClone(fixture), complete: true})}});
+  assert.throws(() => make('prod'), {code: 'MONITOR_HANDLER_CONFIG_INVALID'});
+  assert.throws(() => make('local'), {code: 'MONITOR_HANDLER_CONFIG_INVALID'});
+  const handler = make('dev');
+  assert.equal((await handler()).polled, 1);
+  fixture = [job('alpha', '1'), job('alpha', '2')]; clockNow = now + 3600000;
+  assert.equal((await handler()).polled, 1);
+  clockNow = now + 7200000;
+  await handler();
+  await store.refresh();
+  assert.equal(Object.keys(readMonitor(store).alerts).length, 1, 'baseline quiet, one alert for the controlled new posting, none on repeat');
+  assert.equal(liveCalls, 0, 'fixture sources never call the live reader');
 });
