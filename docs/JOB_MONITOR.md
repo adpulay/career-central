@@ -113,19 +113,42 @@ npm run monitor -- first-poll --source stripe --authorize-live-read
 npm run monitor -- authorize-recurring --source databricks,palantir,stripe,scaleai,cloudflare --hours 168 --max-polls 5
 ```
 
-```bat
-:: 3. Windows Task Scheduler trigger (every 10 minutes, runs while the user is logged on)
-schtasks /Create /TN "CareerCentral\MonitorTick" /SC MINUTE /MO 10 /F /TR "wsl.exe -d <Distro> -u <user> -- <absolute-repo-path>/scripts/job-monitor-tick.sh"
+```powershell
+# 3. Windows Task Scheduler trigger (PowerShell, run as the normal Windows user; no admin rights needed)
+$action   = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d <Distro> -u <user> -- <absolute-repo-path>/scripts/job-monitor-tick.sh"
+$every10  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2) -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Days 8)
+$atLogOn  = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskPath "\CareerCentral\" -TaskName "MonitorTick" -Action $action -Trigger $every10,$atLogOn -Settings $settings -Description "Career Central local monitor tick (7-day pilot)"
 ```
+
+Why these settings:
+- **No overlap:** `-MultipleInstances IgnoreNew`, plus the tick lock (stale after 15 minutes) and per-source leases.
+- **Restarts:** `-StartWhenAvailable` runs a missed tick after a restart or sleep, and the log-on trigger ticks at sign-in.
+- **Bounded runs:** a 10-minute run limit; the repetition ends after 8 days, outliving the 7-day authorization.
+- **Working directory:** the wrapper changes to its own repository and loads Node through nvm, so it doesn't depend on the task's working directory.
+- **Session:** it runs only while the user is logged on, because `wsl.exe` needs the user session.
+
+**User account.** Use `-u root` for now: the repository and data are root-owned (0600/0700), every development session runs as root, and the normal WSL user has no Node install. Running as a normal user needs a separate, approved change: `chown -R` the repository and data to that user, install Node for them, and run all agents as that user, so new files stay readable.
 
 `scripts/job-monitor-tick.sh` runs one tick and appends a sanitized JSON line to `data/logs/job-monitor-tick.log` (0600, rotated at 5 MiB). Without an unexpired authorization it exits 1 with `MONITOR_RECURRING_NOT_AUTHORIZED` and polls nothing; this was verified on a copy of the data.
 
 **Pause or stop at any time:**
 - `npm run monitor -- pause --source <id>` and `resume` work per source.
 - `npm run monitor -- revoke-recurring` stops all polling on the next tick.
-- `schtasks /Delete /TN "CareerCentral\MonitorTick" /F` removes the trigger.
+- `Unregister-ScheduledTask -TaskPath "\CareerCentral\" -TaskName "MonitorTick" -Confirm:$false` removes the trigger. `Disable-ScheduledTask` pauses it.
 
 The authorization expires after 168 hours; ticks then poll nothing and health shows `authorization_expired`.
+
+## Storage port and cloud-readiness pieces (CC-017 C0)
+
+Monitor functions accept either a data root (the local file store, with unchanged layout and behavior) or an injected store object.
+- `updateSource` reads and writes one employer's control record and partition, compares them separately, and rejects stale writers with `MONITOR_STORE_CONFLICT`.
+- An unchanged snapshot, including a 304, writes no partition content. The posting-level `lastSeenAt` moves only on a change or reappearance; `lastObservedAt` on the source records the latest complete observation, and the dashboard derives a listed posting's last-seen time from it.
+- `monitor-memory-store.mjs` is the reference model of the cloud shape: separately versioned control and partition records, with the partition committed first.
+- Also implemented: a minimized eligibility projection (`eligibility-projection.mjs`), redacted telemetry with EMF metrics (`monitor-telemetry.mjs`) and a Lambda-compatible handler (`monitor-handler.mjs`).
+
+None of this deploys anything or adds an AWS dependency.
 
 ## Persistence and recovery contract
 
