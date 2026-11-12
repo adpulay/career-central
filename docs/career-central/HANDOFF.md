@@ -1,5 +1,16 @@
 # Latest handoff
 
+## First fixture-only AWS test ready to execute on approval — 2026-11-12 (late)
+
+- **Execute exactly** [AWS_C1 → First deployment](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval): one-time setup P1–P4 (bootstrap permission set), then steps 1–17 (operator permission set), stopping at the first unmet criterion.
+- **The user provides:**
+  - The dev account id.
+  - Two Identity Center permission sets: `AdministratorAccess` for the bootstrap session only, and `CareerCentralDevOperator` with `infra/policies/dev-operator-policy.json`.
+  - The AWS CLI SSO profiles `cc-dev-bootstrap` and `cc-dev`.
+  - The budget alert email address.
+  - Billing access enabled for IAM roles, if P4 fails.
+- **Not in scope:** schedule, live reads, real sources, alarm notifications, GitHub OIDC, prod, and merging C1 into the live checkout.
+
 ## C1 ready for the fixture-only dev-test approval — 2026-11-12 (evening)
 
 - **State:** the C1 branch is reviewed for deployment and still unmerged. Do **not** merge it into the live pilot checkout until the user approves; the pilot runs that checkout every 10 minutes.

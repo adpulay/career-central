@@ -51,6 +51,7 @@ Configuration is one JSON object passed as CDK context `careerCentral`, and
 | `reservedConcurrency` | unset | 1 or 2; new accounts may lack the headroom |
 | `account`, `region` | unset | required for prod |
 | `confirmProduction` | `false` | must be `true` for prod |
+| `permissionsBoundaryName` | unset | name of a pre-created managed policy applied as the boundary of both stack roles (dev: `CareerCentralDevRoleBoundary`) |
 
 ## Local checks (no credentials)
 
@@ -75,28 +76,44 @@ and reads no user-layer file.
 - **One region** that offers `nodejs24.x` on arm64 and EventBridge Scheduler. `us-east-1` matches the cost estimates in CLOUD_DEPLOYMENT_PLAN §11.
 - **Short-lived credentials only**: an IAM Identity Center (SSO) profile, e.g. `aws sso login --profile cc-dev`. No access keys on disk or in the repository. No GitHub OIDC role for this test.
 
-### Operator permissions (two Identity Center permission sets in the dev account)
+### Permissions (three reviewed policy files in `infra/policies/`, checked offline by `infra/test/dev-policies.test.mjs`)
 
-1. **Bootstrap, used once:** `AdministratorAccess`, only for the `cdk bootstrap` session, then unassigned. Bootstrap creates IAM roles, so a narrower set saves little.
-2. **Dev operator, for the test.** Resources are scoped by generated-name prefix: bucket `careercentralmonitor-dev-*`, table, function, log group and alarms `CareerCentralMonitor-dev-*`.
-   - Deploy: `sts:AssumeRole` on `arn:aws:iam::<account>:role/cdk-hnb659fds-{deploy,file-publishing,lookup}-role-<account>-<region>`. CloudFormation then acts through the bootstrap roles.
-   - Inspect: `cloudformation:DescribeStacks` and `DescribeStackResources` on the stack; `lambda:GetFunctionConfiguration` and `GetFunctionEventInvokeConfig`; `scheduler:GetSchedule`; `s3:GetBucketPublicAccessBlock` and `GetEncryptionConfiguration`; `dynamodb:DescribeTable` and `DescribeContinuousBackups`; `cloudwatch:DescribeAlarms`; `logs:FilterLogEvents`; `iam:SimulatePrincipalPolicy` on the two stack roles; `budgets:ViewBudget`.
-   - Test: `lambda:InvokeFunction`; `s3:GetObject`, `s3:PutObject` on `projection/*`, `fixtures/*`, `probe/*` and `monitor/partitions/*`, plus `s3:ListBucket`; `dynamodb:GetItem`, `PutItem` and `DeleteItem` on the table.
-   - Emergency stop: `lambda:PutFunctionConcurrency`.
-   - Teardown: `s3:ListBucketVersions`, `s3:DeleteObjectVersion`, `s3:DeleteBucket`; `dynamodb:DeleteTable`.
+CDK's default bootstrap gives CloudFormation `AdministratorAccess`. This proposal replaces it with three layers. Every ARN is pinned to `us-east-1` and to the stack's generated-name prefixes: bucket `careercentralmonitor-dev-*`; table, roles, function, log group, schedule and alarms `CareerCentralMonitor-dev-*`; budget `career-central-dev`.
+
+| Policy | Attached to | What it allows |
+|---|---|---|
+| `dev-cfn-execution-policy.json` → managed policy `CareerCentralDevCfnExec` | The bootstrap CloudFormation execution role (`--cloudformation-execution-policies`) | Create, update and delete exactly the 11 resource types in the stack. It creates roles **only if** they carry the boundary below, and passes roles only to Lambda and Scheduler. It cannot delete the bucket or table (they are retained). It explicitly **denies** Function URLs, Lambda resource permissions, bucket ACLs, removing public-access blocks or boundaries, managed-policy attachment, IAM users or keys, and EC2, API Gateway, ELB and CloudFront. |
+| `dev-role-boundary.json` → managed policy `CareerCentralDevRoleBoundary` | Permissions boundary of both stack roles (`permissionsBoundaryName`) | Exactly the runtime actions the function and scheduler use, and nothing else (a test pins equality). An over-broad inline policy could therefore never take effect. |
+| `dev-operator-policy.json` | Inline policy of the Identity Center permission set `CareerCentralDevOperator` | Deploy only by assuming the CDK deploy, file-publishing and lookup roles. Then: invoke, inspect, the emergency stop, seed and probe objects and items, the IAM simulator on the stack roles, viewing budgets, and teardown of the retained bucket and table. It **cannot** edit IAM, CloudFormation, function code or the schedule directly. |
+
+**Bootstrap (one session):** the `AdministratorAccess` permission set is assigned only for creating the two managed policies and running `cdk bootstrap`, and unassigned straight afterwards. Bootstrap itself creates IAM roles, so a narrower bootstrap identity is not practical.
+
+**Known limit.** The execution policy relies on CloudFormation naming resources `<stack>-<logicalId>-<suffix>`. If AWS names one differently, `cdk deploy` fails with `AccessDenied` and rolls back; a failed first create can leave the retained bucket and table behind (see Rollback). That is a safe failure. Fixing it means amending the policy, which is a new approval, never a switch to `AdministratorAccess`.
 
 ### What CDK creates
 
 | Stack | Resources |
 |---|---|
-| `CDKToolkit` (bootstrap, once per account and region) | Staging S3 bucket (retained when the stack is deleted), an empty ECR repository, five IAM roles (deploy, file publishing, image publishing, lookup, CloudFormation execution with `AdministratorAccess` by default), SSM parameter `/cdk-bootstrap/hnb659fds/version` |
+| `CDKToolkit` (bootstrap, once per account and region) | Staging S3 bucket (retained when the stack is deleted), an empty ECR repository, five IAM roles (deploy, file publishing, image publishing, lookup, and CloudFormation execution with `CareerCentralDevCfnExec` instead of the default `AdministratorAccess`), SSM parameter `/cdk-bootstrap/hnb659fds/version`. Default bucket encryption; no customer-managed KMS key (`--bootstrap-customer-key` is not used) |
+| Created by hand before bootstrap | Managed policies `CareerCentralDevCfnExec` and `CareerCentralDevRoleBoundary` |
 | `CareerCentralMonitor-dev` (18 resources) | 1 S3 bucket + bucket policy; 1 DynamoDB table; 1 log group; 2 IAM roles + 2 inline policies; 1 Lambda function + its event-invoke config (async retries 0); 1 schedule (**DISABLED**); 6 alarms (no actions); 1 budget |
 
-The synthesized template has no VPC, NAT, EC2, RDS, SQS, ECS, KMS key or `AWS::CDK::Metadata` resource.
+The synthesized template has no VPC, NAT, EC2, RDS, SQS, ECS, KMS key or `AWS::CDK::Metadata` resource. It also has no publicly reachable endpoint:
+- No Lambda Function URL, resource-based permission, API Gateway, load balancer or CloudFront.
+- The bucket policy contains only a TLS-only Deny, and all four public-access blocks are on.
+- The function is invoked only by IAM-authenticated calls: the operator, or the disabled schedule's role.
+
+With no VPC there is no NAT gateway or interface endpoint charge. The fixture test makes no outbound employer requests, so data transfer is effectively zero.
 
 ### Budget
 
-`budgetLimitUsd` 5 (the default) and `budgetEmail` set to the approved address. It emails at 50, 80 and 100 % of actual cost and 100 % of forecast cost.
+`budgetLimitUsd` 5 and `budgetEmail` set to the approved address. It emails at 50, 80 and 100 % of actual cost and 100 % of forecast cost.
+- **Email subscription.** AWS Budgets emails the address directly. Unlike an SNS email subscription, there is no confirmation link to click.
+  - Use an address you read; it is stored in the Budget resource and the CloudFormation template.
+  - Allow mail from AWS so the alerts aren't filtered as spam.
+  - Step 6 confirms that the subscriber is registered. No test email can be triggered.
+- **Billing access.** In a member account, the root user may need to enable *IAM user and role access to Billing information* (Account settings) before an Identity Center role can create or view budgets. Preflight step P4 checks this.
+- **Forecast alerts** need cost history, so in a new account the 100 % forecast alert may not fire for weeks; the actual-cost alerts do.
 - It is an **alert, not a cap**. AWS updates billing data a few times a day, so an alert can lag by hours.
 - At 100 %: throttle the function to 0 (Emergency stop below) and tear down.
 
@@ -104,14 +121,30 @@ The synthesized template has no VPC, NAT, EC2, RDS, SQS, ECS, KMS key or `AWS::C
 
 Preconditions, in `infra/`: `npm ci`, `npm test` (all pass), and the synth below with no findings.
 
+**P — one-time setup with the bootstrap permission set** (`AWS_PROFILE=cc-dev-bootstrap`; unassign it afterwards):
+
 ```bash
 cd infra
-export AWS_PROFILE=cc-dev AWS_REGION=<approved-region>
-CTX='careerCentral={"budgetEmail":"<approved-address>","fixtureSources":["alpha"]}'
-aws sts get-caller-identity --query Account               # 1. confirm the dev account id
-npx cdk bootstrap aws://<account>/<region>                 # 2. once (bootstrap permission set)
+export AWS_PROFILE=cc-dev-bootstrap AWS_REGION=us-east-1 ACCOUNT=<12-digit dev account id>
+[ "$(aws sts get-caller-identity --query Account --output text)" = "$ACCOUNT" ] || echo "WRONG ACCOUNT - stop"   # P1
+for p in dev-cfn-execution-policy dev-role-boundary; do                                                  # P2: free, read-only lint
+  aws accessanalyzer validate-policy --policy-type IDENTITY_POLICY --policy-document file://policies/$p.json --query 'findings[].[findingType,issueCode]'; done
+aws iam create-policy --policy-name CareerCentralDevRoleBoundary --policy-document file://policies/dev-role-boundary.json   # P3
+aws iam create-policy --policy-name CareerCentralDevCfnExec      --policy-document file://policies/dev-cfn-execution-policy.json
+npx cdk bootstrap aws://$ACCOUNT/us-east-1 --cloudformation-execution-policies arn:aws:iam::$ACCOUNT:policy/CareerCentralDevCfnExec
+aws budgets describe-budgets --account-id "$ACCOUNT" --query 'length(Budgets || `[]`)'                   # P4: billing access works
+```
+
+P2 must report no `ERROR` or `SECURITY_WARNING` findings. If it does, stop and amend the file (a new review).
+
+**Deploy with the operator permission set:**
+
+```bash
+export AWS_PROFILE=cc-dev AWS_REGION=us-east-1
+CTX='careerCentral={"budgetEmail":"<approved-address>","budgetLimitUsd":5,"fixtureSources":["alpha"],"permissionsBoundaryName":"CareerCentralDevRoleBoundary"}'
+[ "$(aws sts get-caller-identity --query Account --output text)" = "$ACCOUNT" ] || echo "WRONG ACCOUNT - stop"   # 1
 npx cdk synth --quiet --context "$CTX"                     # 3. clean cdk-nag report
-npx cdk diff --context "$CTX"                              # 4. review: only the 18 resources above
+npx cdk diff --context "$CTX"                              # 4. review: only the 18 resources above, both roles with the boundary
 npx cdk deploy CareerCentralMonitor-dev --context "$CTX" --require-approval broadening   # 5. confirm the IAM summary
 OUT=$(aws cloudformation describe-stacks --stack-name CareerCentralMonitor-dev --query 'Stacks[0].Outputs' --output json)
 B=$(echo "$OUT" | node -pe 'JSON.parse(require("fs").readFileSync(0)).find(o=>o.OutputKey==="BucketName").OutputValue')
@@ -123,7 +156,7 @@ invoke() { aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-ba
 
 | # | Action | Success criterion |
 |---|---|---|
-| 6 | Read back the configuration: `aws scheduler get-schedule` (name from `describe-stack-resources`), `aws lambda get-function-configuration --function-name "$FN" --query Environment.Variables`, `aws lambda get-function-event-invoke-config --function-name "$FN"`, `aws s3api get-public-access-block --bucket "$B"`, `aws dynamodb describe-continuous-backups --table-name "$T"` | Schedule `DISABLED`; `MONITOR_LIVE_READS=disabled`, `MONITOR_FIXTURE_SOURCES=alpha`; `MaximumRetryAttempts` 0; all four public-access blocks true; PITR `ENABLED` |
+| 6 | Read back the configuration: `aws scheduler get-schedule` (name from `describe-stack-resources`), `aws lambda get-function-configuration --function-name "$FN" --query Environment.Variables`, `aws lambda get-function-event-invoke-config --function-name "$FN"`, `aws s3api get-public-access-block --bucket "$B"`, `aws dynamodb describe-continuous-backups --table-name "$T"`, `aws budgets describe-subscribers-for-notification --account-id "$ACCOUNT" --budget-name career-central-dev --notification NotificationType=ACTUAL,ComparisonOperator=GREATER_THAN,Threshold=50,ThresholdType=PERCENTAGE` | Schedule `DISABLED`; `MONITOR_LIVE_READS=disabled`, `MONITOR_FIXTURE_SOURCES=alpha`; `MaximumRetryAttempts` 0; all four public-access blocks true; PITR `ENABLED`; one `EMAIL` subscriber with the approved address |
 | 7 | `invoke out0.json` **before seeding** | Function error with message `MONITOR_LAMBDA_OBJECT_MISSING`, **not** `AccessDenied`. This proves a missing key reads as 404 under the function role (the `ListBucket` grant). |
 | 8 | `$SEED probe $TARGET` | `passed: true`. Every check holds on the real services: S3 missing key → null, `If-None-Match: *` and stale `If-Match` → 412, current ETag accepted; DynamoDB create-only and stale version → conditional failure, consistent read sees the latest, stale delete refused, probe item removed. |
 | 9 | `$SEED seed $TARGET --hours 2`, then `invoke out1.json`, then `$SEED status $TARGET` | `ok: true`, `polled: 1`; `alertCount` 0 (quiet baseline); `provenance: synthetic` |
@@ -194,9 +227,11 @@ aws dynamodb update-table --table-name "$T" --no-deletion-protection-enabled   #
 aws dynamodb delete-table --table-name "$T"
 ```
 
-To remove the bootstrap as well (optional, once nothing else uses it):
+To remove the bootstrap as well (optional, once nothing else uses it; bootstrap permission set):
 1. `aws cloudformation delete-stack --stack-name CDKToolkit`.
 2. Empty and delete the retained `cdk-hnb659fds-assets-<account>-<region>` bucket the same way.
+3. `aws iam delete-policy --policy-arn arn:aws:iam::$ACCOUNT:policy/CareerCentralDevCfnExec`, then the same for `CareerCentralDevRoleBoundary`. Do this only after both stacks are gone, since a policy still attached to a role cannot be deleted.
+4. Remove the `CareerCentralDevOperator` permission-set assignment in IAM Identity Center.
 
 Check the Billing console the next day to confirm no resources remain.
 

@@ -1,5 +1,14 @@
 # Verified project state
 
+## CC-017 C1 first-deployment procedure finalized with narrow permissions — 2026-11-12 (late)
+
+- **Procedure:** fixture-only, `us-east-1`, $5 budget, manual invocations; see [AWS_C1](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval). It now uses a scoped CloudFormation execution policy and a role permissions boundary in place of CDK's default `AdministratorAccess` execution role, plus a scoped operator policy (`infra/policies/`, tested offline).
+- **Verified:**
+  - The template has no public endpoint (no Function URL, Lambda permission, API Gateway, load balancer or CloudFront) and no networking resources.
+  - Budget email needs no confirmation click.
+  - Teardown covers the versioned bucket, the retained table, the bootstrap and the two managed policies.
+- **Tests:** infra 30/30. Nothing provisioned; the pilot is untouched.
+
 ## CC-017 C1 predeployment review complete; fixture-only dev test proposed — 2026-11-12 (evening)
 
 **C1** (branch `career-central/cc-017-c1`; not merged; nothing provisioned; no AWS account, credentials or GitHub access created). Details and the exception register are in [CC-017](tasks/CC-017.md#c1-predeployment-review-2026-11-12-evening-nothing-provisioned); the proposal is in [AWS_C1](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval).
