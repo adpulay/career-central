@@ -544,7 +544,37 @@ The budget and SCPs remain as account guardrails; removing them is a separate de
   ```
 
   The CloudShell copy at `~/cc/career-central-c1` predates this change. Upload the rebuilt package before comparing.
-- **Not recorded yet:** the results of acceptance steps 6–17 (configuration read-back, budget recipient Active, the pre-seed 404 check, probe, quiet baseline, one alert, no duplicate, concurrency, simulator, revoke, log scan, alarms, next-day bill). Record each outcome here when run. Until then, the deployment is a successful create, not an accepted test.
+- **User-verified acceptance checks (2026-11-12): passed.** These are the individual checks below only; **the full C1 acceptance suite has not passed**.
+
+  | Check | Runbook step | Verified result |
+  |---|---|---|
+  | Stack status | 5–6 | `CareerCentralMonitor-dev` `CREATE_COMPLETE` |
+  | Function state | 6 | Lambda `Active` |
+  | Schedule | 6 | EventBridge schedule `DISABLED` |
+  | Live employer reads | 6 | `MONITOR_LIVE_READS=disabled` |
+  | Fixture source | 6 | `MONITOR_FIXTURE_SOURCES=alpha` |
+  | Async invoke config | 6 | `MaximumRetryAttempts` 0, `MaximumEventAgeInSeconds` 300 |
+  | Bucket Block Public Access | 6 | all four settings `true` |
+  | DynamoDB PITR | 6 | `ENABLED` |
+  | First manual invocation (quiet baseline) | 9 | HTTP 200; `ok: true`, `polled: 1`, `failed: 0`. The source then `healthy`, checkpoint provenance `synthetic`, 0 alerts |
+  | Second manual invocation (repeat, nothing due) | — | HTTP 200; `ok: true`, `polled: 0`, `failed: 0`. The source stayed `healthy`, 0 alerts |
+
+- **Pending:** not run, or not reported. The deployment is a successful create with a verified configuration and quiet baseline, **not an accepted test**.
+  - Step 6, remaining read-backs: no function URL, no Lambda resource policy, table `OnDemandThroughput` 10/10, the permissions boundary on both roles, the budget email subscriber.
+  - Step 6a: the guardrail budget recipient is **Active**.
+  - Step 7: invocation before seeding returns `MONITOR_LAMBDA_OBJECT_MISSING`, not `AccessDenied` (the 404-on-missing-key check of the `ListBucket` grant). Seeding has already happened, so this needs a temporarily missing object or a fresh stack.
+  - Step 8: `probe` of real S3 and DynamoDB conditional semantics.
+  - **Alerting:**
+    - Step 10: one new fixture posting → exactly one alert.
+    - Step 11: repeated check → no duplicate.
+  - **Concurrency and failure/recovery:**
+    - Step 12: concurrent invocations.
+    - CC-017 dev acceptance: an injected mid-poll timeout → `worker_lost` and reclaim; a stale writer gets a 412 with nothing corrupted; Retry-After and backoff honoured; the restore drill (S3 version + PITR).
+  - **Permissions:** step 13, IAM simulator checks of the runtime role (and of the execution role in CloudShell step 5).
+  - **Revocation:** step 14, revoke → the tick polls nothing.
+  - **Logs and alarms:** step 15, the log scan for posting text; step 16, no alarm in `ALARM`.
+  - **Cost:** step 17, next-day bill under $0.50, then one week of measured cost against the forecast.
+  - The live-v2 policy comparison above.
 - **Still not enabled, each a separate approval:** the EventBridge schedule, live employer reads, real sources, alarm notifications, GitHub OIDC, prod.
 
 ## Later stages (each a separate approval)

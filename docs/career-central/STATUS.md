@@ -4,7 +4,20 @@
 
 - **Deployment:** the user reports the fixture-only stack deployed to 978446946447 / us-east-1. Schedule disabled, live reads off, synthetic source only.
 - **Policy change:** `CareerCentralDevCfnExec` was updated in AWS to v2. The change adds `ssm:GetParameters` on `parameter/cdk-bootstrap/hnb659fds/version` only, which CloudFormation needs to resolve `BootstrapVersion`. The repository policy now matches, with regression tests (infra 51/51), and the CloudShell package was rebuilt.
-- **Acceptance steps 6–17 are not yet recorded**, so this is a successful create, not an accepted test. See [AWS_C1 → Deployment record](../AWS_C1.md#deployment-record).
+- **User-verified checks, passed:**
+  - **Stack and configuration:** stack `CREATE_COMPLETE`; Lambda `Active`; schedule `DISABLED`; live reads `disabled`; fixture source `alpha`; async retries 0 with a 300 s maximum event age; bucket Block Public Access all four true; DynamoDB PITR `ENABLED`.
+  - **Invocations:**
+    - The first manual invocation returned HTTP 200 (`ok: true`, `polled: 1`, `failed: 0`). The source was then `healthy` with `synthetic` provenance and 0 alerts (a quiet baseline).
+    - The second returned HTTP 200 (`ok: true`, `polled: 0`, `failed: 0`), and the source stayed healthy with 0 alerts.
+- **The full C1 acceptance suite has not passed.** Still pending:
+  - the remaining configuration read-backs and the Active budget recipient;
+  - the pre-seed 404 check and the S3/DynamoDB conditional-semantics probe;
+  - alerting (one alert for a new posting, no duplicate);
+  - concurrency;
+  - failure/recovery (timeout → `worker_lost`, stale-writer 412, backoff, restore drill);
+  - IAM simulator checks, revocation, log scan, alarms and measured cost.
+
+  See [AWS_C1 → Deployment record](../AWS_C1.md#deployment-record).
 
 ## CC-017 C1 security review for account 978446946447; CloudShell procedure ready — 2026-11-12 (late)
 
