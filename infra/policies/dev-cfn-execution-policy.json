@@ -115,7 +115,7 @@
       "Sid": "NoPublicEndpointsOrNetworking",
       "Effect": "Deny",
       "Action": ["lambda:CreateFunctionUrlConfig", "lambda:UpdateFunctionUrlConfig", "lambda:AddPermission", "s3:PutBucketAcl",
-        "s3:DeleteBucketPublicAccessBlock", "s3:PutAccountPublicAccessBlock", "ec2:*", "apigateway:*", "elasticloadbalancing:*", "cloudfront:*"],
+        "s3:PutAccountPublicAccessBlock", "ec2:*", "apigateway:*", "elasticloadbalancing:*", "cloudfront:*"],
       "Resource": "*"
     }
   ]

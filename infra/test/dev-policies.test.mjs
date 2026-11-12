@@ -82,7 +82,7 @@ test('execution policy: roles only with the boundary; pass roles only to Lambda 
   assert.ok(!allows(exec).filter(s => s !== create).some(s => roleActions.some(action => covers(new Set([s.Action].flat()), action))), 'no unconditioned role creation');
   assert.deepEqual(exec.Statement.find(s => s.Sid === 'PassStackRolesToLambdaAndScheduler').Condition, {StringEquals: {'iam:PassedToService': ['lambda.amazonaws.com', 'scheduler.amazonaws.com']}});
   const denied = new Set(exec.Statement.filter(s => s.Effect === 'Deny').flatMap(s => [s.Action].flat()));
-  for (const action of ['lambda:CreateFunctionUrlConfig', 'lambda:AddPermission', 's3:DeleteBucketPublicAccessBlock', 'iam:DeleteRolePermissionsBoundary', 'ec2:*',
+  for (const action of ['lambda:CreateFunctionUrlConfig', 'lambda:AddPermission', 's3:PutAccountPublicAccessBlock', 's3:PutBucketAcl', 'iam:DeleteRolePermissionsBoundary', 'ec2:*',
     'iam:CreatePolicyVersion', 'iam:SetDefaultPolicyVersion', 'iam:AttachRolePolicy', 'iam:CreateUser', 'iam:CreateAccessKey']) assert.ok(denied.has(action), action);
 });
 

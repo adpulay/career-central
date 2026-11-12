@@ -72,6 +72,7 @@ test('CloudFormation role: creates and rolls back exactly the stack, roles only 
     ['iam:PassRole', ARN.tickRole, ctx({'iam:PassedToService': 'lambda.amazonaws.com'}), 'allowed'],
     ['iam:PassRole', ARN.schedRole, ctx({'iam:PassedToService': 'scheduler.amazonaws.com'}), 'allowed'],
     ['s3:CreateBucket', ARN.bucket, ctx(), 'allowed'], ['s3:PutBucketPolicy', ARN.bucket, ctx(), 'allowed'], ['s3:PutLifecycleConfiguration', ARN.bucket, ctx(), 'allowed'],
+    ['s3:PutBucketPublicAccessBlock', ARN.bucket, ctx(), 'allowed'], ['s3:PutBucketOwnershipControls', ARN.bucket, ctx(), 'allowed'],
     ['s3:GetObject', `${ARN.staging}/abc.zip`, ctx(inAcct), 'allowed'], ['kms:Decrypt', `arn:aws:kms:${R}:${A}:key/1234`, ctx({'kms:ViaService': `s3.${R}.amazonaws.com`}), 'allowed'],
     ['dynamodb:CreateTable', ARN.table, ctx(), 'allowed'], ['dynamodb:UpdateContinuousBackups', ARN.table, ctx(), 'allowed'], ['dynamodb:DescribeTable', ARN.table, ctx(), 'allowed'],
     ['lambda:CreateFunction', ARN.fn, ctx(), 'allowed'], ['lambda:PutFunctionEventInvokeConfig', ARN.fn, ctx(), 'allowed'], ['lambda:GetFunctionRecursionConfig', ARN.fn, ctx(), 'allowed'],
@@ -105,7 +106,11 @@ test('CloudFormation role cannot escalate, remove boundaries, open public endpoi
     ['iam:CreateUser', `arn:aws:iam::${A}:user/x`, ctx(), 'explicitDeny'], ['iam:CreateAccessKey', `arn:aws:iam::${A}:user/x`, ctx(), 'explicitDeny'],
     ['lambda:CreateFunctionUrlConfig', ARN.fn, ctx(), 'explicitDeny'], ['lambda:AddPermission', ARN.fn, ctx(), 'explicitDeny'],
     ['lambda:PutProvisionedConcurrencyConfig', ARN.fn, ctx(), 'explicitDeny'],
-    ['s3:PutBucketAcl', ARN.bucket, ctx(), 'explicitDeny'], ['s3:DeleteBucketPublicAccessBlock', ARN.bucket, ctx(), 'explicitDeny'],
+    ['s3:PutBucketAcl', ARN.bucket, ctx(), 'explicitDeny'], ['s3:PutAccountPublicAccessBlock', '*', ctx(), 'explicitDeny'],
+    // Bucket-level Block Public Access: S3 has no separate "delete" permission (DeletePublicAccessBlock is
+    // authorized by s3:PutBucketPublicAccessBlock), so CloudFormation may set it only on the stack's bucket.
+    ['s3:PutBucketPublicAccessBlock', ARN.staging, ctx(), 'implicitDeny'],
+    ['s3:PutBucketPublicAccessBlock', 'arn:aws:s3:::any-other-bucket', ctx(), 'implicitDeny'],
     ['s3:DeleteBucket', ARN.bucket, ctx(), 'implicitDeny'], ['dynamodb:DeleteTable', ARN.table, ctx(), 'implicitDeny'],
     ['s3:GetObject', `arn:aws:s3:::cdk-hnb659fds-assets-${OTHER}-${R}/abc.zip`, ctx({'aws:ResourceAccount': OTHER}), 'implicitDeny'],
     ['kms:Decrypt', `arn:aws:kms:${R}:${A}:key/1234`, ctx(), 'implicitDeny'], ['kms:CreateKey', '*', ctx(), 'explicitDeny'],
