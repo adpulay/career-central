@@ -16,14 +16,14 @@ const RUNTIME_ASSETS = ['tracker-aliases.json'];
 // Every bundled module shares the bundle's import.meta.url, so CLI main-module
 // guards (lib/is-main-module.mjs) could misfire. Inside the Lambda no bundled
 // module is ever the program entry: the helper is replaced by a constant false.
-const noMainModule = {name: 'no-main-module', setup(builder) {
+export const noMainModule = {name: 'no-main-module', setup(builder) {
   builder.onResolve({filter: /(^|[\\/])is-main-module\.mjs$/}, () => ({path: 'is-main-module', namespace: 'cc-lambda'}));
   builder.onLoad({filter: /.*/, namespace: 'cc-lambda'}, () => ({contents: 'export function isMainModule() { return false; }', loader: 'js'}));
 }};
 // scan.mjs is reachable through the shared admission gate (pure filter helpers);
 // browser automation is only a lazy runtime import there and is kept external.
-const FORBIDDEN = [/playwright/, /chromium-bidi/, /(^|\/)web\/src\/app\//, /(^|\/)generate-pdf\.mjs$/, /(^|\/)data\//];
-const EXTERNAL = ['playwright', 'playwright-core', 'chromium-bidi', 'chromium-bidi/*'];
+export const FORBIDDEN = [/playwright/, /chromium-bidi/, /(^|\/)web\/src\/app\//, /(^|\/)generate-pdf\.mjs$/, /(^|\/)data\//];
+export const EXTERNAL = ['playwright', 'playwright-core', 'chromium-bidi', 'chromium-bidi/*'];
 
 export async function bundle({write = true} = {}) {
   const result = await build({

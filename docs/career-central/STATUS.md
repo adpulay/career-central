@@ -1,5 +1,15 @@
 # Verified project state
 
+## CC-017 C1 security review for account 978446946447; CloudShell procedure ready — 2026-11-12 (late)
+
+- **IAM repairs.**
+  - The boundary condition is now `StringEquals` on the exact account-scoped ARN, with a conditioned `PutRolePermissionsBoundary` and an explicit deny for a missing or different boundary.
+  - Self-escalation denies are in place, all ARNs are pinned to the account, and S3 access is pinned with `aws:ResourceAccount`.
+  - Rollback and delete reads were added. The operator no longer has the lookup role.
+- **SCPs.** CloudShell is allowed, the admin exception covers `AdministratorAccess`, and boundaries, policy versions and bootstrap roles are protected. The table now uses AWS-owned encryption (no KMS path).
+- **CloudShell path** (WSL SSO is not working): an offline, checksummed package with the reviewed assembly pinned to `aws://978446946447/us-east-1`, plus ordered commands in [AWS_C1](../AWS_C1.md#running-from-aws-cloudshell-the-current-path-wsl-sso-is-not-working).
+- **Tests:** infra 44/44; lint passes. **Nothing was executed in AWS.**
+
 ## CC-017 C1 dev-account cost guardrails proposed — 2026-11-12 (late)
 
 - **Proposed, not applied** ([AWS_C1 → Cost guardrails](../AWS_C1.md#cost-guardrails-before-any-deployment-each-step-needs-approval)):

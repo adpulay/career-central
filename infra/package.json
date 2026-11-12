@@ -3,11 +3,14 @@
   "private": true,
   "type": "module",
   "description": "Career Central AWS C1 infrastructure (CDK) and Lambda packaging. Synth/test only; nothing here deploys by itself.",
-  "engines": {"node": ">=22"},
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "bundle": "node scripts/bundle.mjs",
     "synth": "cdk synth --quiet",
-    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "package:cloudshell": "node scripts/package-cloudshell.mjs"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "3.1159.0",

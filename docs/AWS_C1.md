@@ -13,7 +13,7 @@ One CloudFormation stack per environment, `CareerCentralMonitor-dev` or
 | Resource | Settings |
 |----------|----------|
 | S3 bucket | Block Public Access (all four), SSE-S3, TLS-only bucket policy, bucket-owner-enforced ownership, versioning with noncurrent versions expiring after 30 days, aborted multipart uploads cleaned after 1 day, **retained** on stack deletion |
-| DynamoDB table | `pk`/`sk`, on demand, AWS-managed encryption, point-in-time recovery, **retained**; prod adds deletion protection |
+| DynamoDB table | `pk`/`sk`, on demand with a 10/10 request-unit-per-second ceiling, encrypted with the AWS-owned key (no KMS key, permissions or charges), point-in-time recovery, **retained**; prod adds deletion protection |
 | Lambda `monitor-tick` | Node 24, arm64, 512 MB, 300 s, no VPC; live reads **disabled** unless configured; async retries **0** and events older than 5 minutes dropped (the Scheduler invokes asynchronously, so without this Lambda would retry a failed tick twice) |
 | Log group | Retention from config (default 14 days), deleted with the stack |
 | IAM | Function role: write its own log streams; read and write `monitor/partitions/*`; read `projection/*` (plus `fixtures/*` in dev only); `ListBucket` on the bucket, so a missing key reads as 404 rather than 403; `GetItem`/`PutItem` on the one table, and `DeleteItem` only on the tick-lease partition. Scheduler role: `lambda:InvokeFunction` on the one function, assumable only by `scheduler.amazonaws.com` for this account (`aws:SourceAccount`). No managed policies and no wildcard actions |
@@ -238,7 +238,7 @@ CDK's default bootstrap gives CloudFormation `AdministratorAccess`. This proposa
 |---|---|---|
 | `dev-cfn-execution-policy.json` → managed policy `CareerCentralDevCfnExec` | The bootstrap CloudFormation execution role (`--cloudformation-execution-policies`) | Create, update and delete exactly the 10 resource types in the dev stack (no budgets: the account budget belongs to the admin session). It creates roles **only if** they carry the boundary below, and passes roles only to Lambda and Scheduler. It cannot delete the bucket or table (they are retained). It explicitly **denies** Function URLs, Lambda resource permissions, bucket ACLs, removing public-access blocks or boundaries, managed-policy attachment, IAM users or keys, and EC2, API Gateway, ELB and CloudFront. |
 | `dev-role-boundary.json` → managed policy `CareerCentralDevRoleBoundary` | Permissions boundary of both stack roles (`permissionsBoundaryName`) | Exactly the runtime actions the function and scheduler use, and nothing else (a test pins equality). An over-broad inline policy could therefore never take effect. |
-| `dev-operator-policy.json` | Inline policy of the Identity Center permission set `CareerCentralDevOperator` | Deploy only by assuming the CDK deploy, file-publishing and lookup roles. Then: invoke, inspect, the emergency stop, seed and probe objects and items, the IAM simulator on the stack roles, viewing budgets, and teardown of the retained bucket and table. It **cannot** edit IAM, CloudFormation, function code or the schedule directly. |
+| `dev-operator-policy.json` | Inline policy of the Identity Center permission set `CareerCentralDevOperator` | Deploy only by assuming the CDK deploy and file-publishing roles (not the lookup role, which carries `ReadOnlyAccess`; this stack does no lookups). Then: invoke, inspect, the emergency stop, seed and probe objects and items, the IAM simulator on the stack roles, viewing budgets, and teardown of the retained bucket and table. It **cannot** edit IAM, CloudFormation, function code or the schedule directly. |
 
 **Bootstrap (one session):** the `AdministratorAccess` permission set is assigned only for creating the two managed policies and running `cdk bootstrap`, and unassigned straight afterwards. Bootstrap itself creates IAM roles, so a narrower bootstrap identity is not practical.
 
@@ -352,6 +352,172 @@ Any unmet criterion stops the test. Record the outcome in CC-017 before any furt
 | The Lambda code bundle | CDK staging bucket, Lambda | Until teardown |
 
 Never uploaded by this test: `cv.md`, the profile, policy, application history or ledger, email state, résumés, OAuth tokens and real employer data.
+
+## Running from AWS CloudShell (the current path: WSL SSO is not working)
+
+Target: account **978446946447**, region **us-east-1** (Identity Center lives in us-east-2, which does not matter here). Everything runs in a CloudShell session **in us-east-1**, signed in to 978446946447 with the Identity Center `AdministratorAccess` permission set.
+- CloudShell never synthesizes or builds anything. It deploys the reviewed, pre-synthesized assembly from the offline package.
+- The assembly is pinned to `aws://978446946447/us-east-1`, so `cdk deploy` refuses credentials for any other account.
+- Commands are written for an interactive shell: no `set -e`, which would close CloudShell on the first error. Each check prints `OK` or `STOP`; stop at the first `STOP`.
+
+**0. Build the package (WSL, offline; already done for this review).**
+
+```bash
+cd /home/adam/JobScraper/career-ops-c1/infra && npm run package:cloudshell
+sha256sum dist/cloudshell/career-central-c1/SHA256SUMS     # record this value
+```
+
+The SHA256SUMS hash is the integrity anchor. The tarball's own hash changes on every rebuild (file timestamps), but its contents do not. Upload `\\wsl$\Ubuntu\home\adam\JobScraper\career-ops-c1\infra\dist\cloudshell\career-central-c1.tar.gz` with CloudShell → **Actions → Upload file**.
+
+**1. Identity, region and package (read-only).**
+
+```bash
+export ACCOUNT=978446946447 AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1 CDK="npx --yes aws-cdk@2.1146.1"
+[ "$(aws sts get-caller-identity --query Account --output text)" = "$ACCOUNT" ] && echo "OK account" || echo "STOP: wrong account"
+aws sts get-caller-identity --query Arn --output text          # expect .../AWSReservedSSO_AdministratorAccess_...
+node --version                                                  # expect v20 or later
+mkdir -p ~/cc && tar -xzf ~/career-central-c1.tar.gz -C ~/cc && cd ~/cc/career-central-c1
+sha256sum SHA256SUMS                                            # must equal the value recorded at step 0
+sha256sum -c SHA256SUMS --quiet && echo "OK package" || echo "STOP: package altered"
+cat MANIFEST.json
+```
+
+**2. Guardrail gates (read-only; G1–G6 must be in place first).**
+
+```bash
+aws budgets describe-budget --account-id $ACCOUNT --budget-name career-central-dev-guardrail --query 'Budget.[BudgetLimit.Amount,TimeUnit]' --output text   # 5.0 MONTHLY
+#   Console: Billing and Cost Management → Budgets → career-central-dev-guardrail → recipient status must be Active.
+aws s3control get-public-access-block --account-id $ACCOUNT --query 'PublicAccessBlockConfiguration' --output text    # True True True True
+aws ec2 describe-regions --region us-east-1 >/dev/null 2>&1 && echo "STOP: service-allowlist SCP not attached" || echo "OK ec2 denied by SCP"
+aws lambda list-functions --region us-west-2 >/dev/null 2>&1 && echo "STOP: region SCP not attached" || echo "OK other regions denied"
+aws service-quotas get-service-quota --service-code lambda --quota-code L-B99A9384 --query Quota.Value --output text  # >=1000: rebuild with --reserved-concurrency 1
+aws cloudformation describe-stacks --stack-name CDKToolkit >/dev/null 2>&1 && echo "STOP: already bootstrapped - review first" || echo "OK not bootstrapped"
+for p in CareerCentralDevRoleBoundary CareerCentralDevCfnExec; do aws iam get-policy --policy-arn arn:aws:iam::$ACCOUNT:policy/$p >/dev/null 2>&1 && echo "STOP: $p exists" || echo "OK $p absent"; done
+```
+
+**3. Validate the policies with IAM Access Analyzer (read-only, free).**
+
+```bash
+for p in dev-cfn-execution-policy dev-role-boundary dev-operator-policy; do echo "== $p"; aws accessanalyzer validate-policy --policy-type IDENTITY_POLICY --policy-document file://policies/$p.json --query 'findings[].[findingType,issueCode]' --output text; done
+for p in scp-dev-region scp-dev-service-allowlist scp-dev-cost-guardrails; do echo "== $p"; aws accessanalyzer validate-policy --policy-type SERVICE_CONTROL_POLICY --policy-document file://policies/$p.json --query 'findings[].[findingType,issueCode]' --output text; done
+```
+
+Pass: no `ERROR` and no `SECURITY_WARNING`. A `SUGGESTION` or `WARNING` is recorded and reviewed, not ignored.
+
+**4. Create the two managed policies — APPROVAL REQUIRED.**
+
+```bash
+aws iam create-policy --policy-name CareerCentralDevRoleBoundary --description "Career Central dev: permissions boundary for stack roles" --policy-document file://policies/dev-role-boundary.json --query Policy.Arn --output text
+aws iam create-policy --policy-name CareerCentralDevCfnExec --description "Career Central dev: CloudFormation execution policy" --policy-document file://policies/dev-cfn-execution-policy.json --query Policy.Arn --output text
+```
+
+**5. Restricted CDK bootstrap — APPROVAL REQUIRED.**
+
+```bash
+mkdir -p ~/cc/bootstrap && cd ~/cc/bootstrap          # empty directory: no app, nothing to synthesize
+$CDK bootstrap aws://978446946447/us-east-1 \
+  --cloudformation-execution-policies arn:aws:iam::978446946447:policy/CareerCentralDevCfnExec \
+  --bootstrap-kms-key-id AWS_MANAGED_KEY --public-access-block-configuration true
+```
+
+Verify (read-only). The execution role must carry **only** `CareerCentralDevCfnExec`, never `AdministratorAccess`:
+
+```bash
+EXEC=cdk-hnb659fds-cfn-exec-role-$ACCOUNT-us-east-1
+aws iam list-attached-role-policies --role-name $EXEC --query 'AttachedPolicies[].PolicyArn' --output text   # exactly arn:aws:iam::978446946447:policy/CareerCentralDevCfnExec
+[ "$(aws iam list-attached-role-policies --role-name $EXEC --query 'AttachedPolicies[].PolicyName' --output text)" = "CareerCentralDevCfnExec" ] && echo "OK restricted exec role" || echo "STOP: unexpected exec-role policies"
+[ -z "$(aws iam list-role-policies --role-name $EXEC --query 'PolicyNames' --output text)" ] && echo "OK no inline policies" || echo "STOP: inline policy on exec role"
+aws cloudformation describe-stacks --stack-name CDKToolkit --query "Stacks[0].Parameters[?ParameterKey=='CloudFormationExecutionPolicies'||ParameterKey=='TrustedAccounts'||ParameterKey=='FileAssetsBucketKmsKeyId'].[ParameterKey,ParameterValue]" --output text
+#   expect: the CareerCentralDevCfnExec ARN, an empty TrustedAccounts, and AWS_MANAGED_KEY
+```
+
+Then simulate the execution role (read-only; the simulator applies SCPs). Each line prints the decision:
+
+```bash
+EXEC_ARN=arn:aws:iam::$ACCOUNT:role/$EXEC; BND=arn:aws:iam::$ACCOUNT:policy/CareerCentralDevRoleBoundary; ROLE=arn:aws:iam::$ACCOUNT:role/CareerCentralMonitor-dev-Probe
+sim() { aws iam simulate-principal-policy --policy-source-arn $EXEC_ARN "$@" --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text; }
+sim --action-names iam:CreateRole iam:PutRolePolicy --resource-arns $ROLE --context-entries "ContextKeyName=iam:PermissionsBoundary,ContextKeyValues=$BND,ContextKeyType=string"   # allowed allowed
+sim --action-names iam:CreateRole iam:PutRolePolicy --resource-arns $ROLE                                                                                            # explicitDeny explicitDeny
+sim --action-names iam:CreateRole --resource-arns $ROLE --context-entries "ContextKeyName=iam:PermissionsBoundary,ContextKeyValues=arn:aws:iam::aws:policy/AdministratorAccess,ContextKeyType=string"  # explicitDeny
+sim --action-names iam:DeleteRolePermissionsBoundary iam:AttachRolePolicy --resource-arns $ROLE                                                                      # explicitDeny explicitDeny
+sim --action-names iam:CreatePolicyVersion iam:SetDefaultPolicyVersion --resource-arns arn:aws:iam::$ACCOUNT:policy/CareerCentralDevCfnExec                          # explicitDeny explicitDeny
+sim --action-names iam:PutRolePolicy --resource-arns $EXEC_ARN                                                                                                       # explicitDeny
+sim --action-names lambda:CreateFunctionUrlConfig lambda:AddPermission --resource-arns arn:aws:lambda:us-east-1:$ACCOUNT:function:CareerCentralMonitor-dev-Probe  # explicitDeny explicitDeny
+sim --action-names ec2:RunInstances s3:DeleteBucket dynamodb:DeleteTable                                                                                            # explicitDeny implicitDeny implicitDeny
+```
+
+**6. Fixture-only deployment — APPROVAL REQUIRED.**
+
+```bash
+cd ~/cc/career-central-c1
+$CDK diff --app cdk.out CareerCentralMonitor-dev          # review: 17 resources, both roles with the boundary, no budget
+$CDK deploy --app cdk.out CareerCentralMonitor-dev --require-approval broadening   # confirm the IAM summary when prompted
+```
+
+**7. Acceptance (steps 6–17 of the test table, CloudShell form).** Capture the names first; teardown needs them after the stack is gone:
+
+```bash
+q() { aws cloudformation describe-stacks --stack-name CareerCentralMonitor-dev --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+B=$(q BucketName); T=$(q TableName); FN=$(q FunctionName); echo "B=$B T=$T FN=$FN" | tee ~/cc/names.txt
+res() { aws cloudformation describe-stack-resources --stack-name CareerCentralMonitor-dev --query "StackResources[?$1].PhysicalResourceId" --output text; }
+SCHED=$(res "ResourceType=='AWS::Scheduler::Schedule'"); TICK=$(res "ResourceType=='AWS::IAM::Role' && starts_with(LogicalResourceId,'MonitorTickRole')")
+LG=$(aws lambda get-function-configuration --function-name "$FN" --query LoggingConfig.LogGroup --output text)
+# 6: configuration
+aws scheduler get-schedule --name "$SCHED" --query State --output text                                            # DISABLED
+aws lambda get-function-configuration --function-name "$FN" --query 'Environment.Variables.[MONITOR_LIVE_READS,MONITOR_FIXTURE_SOURCES]' --output text   # disabled alpha
+aws lambda get-function-event-invoke-config --function-name "$FN" --query '[MaximumRetryAttempts,MaximumEventAgeInSeconds]' --output text   # 0 300
+aws lambda get-function-url-config --function-name "$FN" >/dev/null 2>&1 && echo "STOP: function URL" || echo "OK no function URL"
+aws lambda get-policy --function-name "$FN" >/dev/null 2>&1 && echo "STOP: resource policy" || echo "OK no resource policy"
+aws s3api get-public-access-block --bucket "$B" --query PublicAccessBlockConfiguration --output text               # True True True True
+aws dynamodb describe-table --table-name "$T" --query 'Table.[BillingModeSummary.BillingMode,OnDemandThroughput.MaxReadRequestUnits,OnDemandThroughput.MaxWriteRequestUnits]' --output text   # PAY_PER_REQUEST 10 10
+aws dynamodb describe-continuous-backups --table-name "$T" --query ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus --output text   # ENABLED
+for r in $(res "ResourceType=='AWS::IAM::Role'"); do aws iam get-role --role-name $r --query 'Role.[RoleName,PermissionsBoundary.PermissionsBoundaryArn]' --output text; done   # both: ...policy/CareerCentralDevRoleBoundary
+# 7-14: fixture flow
+SEED="node $HOME/cc/career-central-c1/seed-dev-fixture.mjs"; TARGET="--apply --bucket $B --table $T --region us-east-1"
+invoke() { aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out --payload '{}' "$1" --query '[StatusCode,FunctionError]' --output text; cat "$1"; echo; }
+invoke ~/cc/out0.json        # 7: FunctionError Unhandled with MONITOR_LAMBDA_OBJECT_MISSING (NOT AccessDenied)
+$SEED probe $TARGET          # 8: "passed":true
+$SEED seed $TARGET --hours 2 && invoke ~/cc/out1.json && $SEED status $TARGET                 # 9: ok, polled 1, alertCount 0, provenance synthetic
+$SEED fixture --step 2 $TARGET && sleep 370 && invoke ~/cc/out2.json && $SEED status $TARGET  # 10: alertCount 1
+sleep 370 && invoke ~/cc/out3.json && $SEED status $TARGET                                     # 11: alertCount still 1
+for i in 1 2; do aws lambda invoke --function-name "$FN" --invocation-type Event --cli-binary-format raw-in-base64-out --payload '{}' /dev/null --query StatusCode --output text & done; wait; sleep 30; $SEED status $TARGET   # 12: alertCount still 1
+TICK_ARN=arn:aws:iam::$ACCOUNT:role/$TICK
+aws iam simulate-principal-policy --policy-source-arn $TICK_ARN --action-names s3:DeleteObject s3:PutObject --resource-arns "arn:aws:s3:::$B/projection/x" --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text   # 13: implicitDeny implicitDeny
+aws iam simulate-principal-policy --policy-source-arn $TICK_ARN --action-names dynamodb:DeleteItem --resource-arns arn:aws:dynamodb:us-east-1:$ACCOUNT:table/$T --context-entries "ContextKeyName=dynamodb:LeadingKeys,ContextKeyValues=SOURCE#alpha,ContextKeyType=stringList" --query 'EvaluationResults[].EvalDecision' --output text   # implicitDeny
+aws iam simulate-principal-policy --policy-source-arn $TICK_ARN --action-names dynamodb:DeleteItem --resource-arns arn:aws:dynamodb:us-east-1:$ACCOUNT:table/$T --context-entries "ContextKeyName=dynamodb:LeadingKeys,ContextKeyValues=MONITOR,ContextKeyType=stringList" --query 'EvaluationResults[].EvalDecision' --output text   # allowed
+$SEED revoke $TARGET && sleep 370 && invoke ~/cc/out4.json && $SEED status $TARGET             # 14: ok false, MONITOR_RECURRING_NOT_AUTHORIZED; nothing polled
+# 15-16: logs and alarms
+for p in '"example.invalid"' '"Fictional Alpha"'; do aws logs filter-log-events --log-group-name "$LG" --filter-pattern "$p" --query 'length(events)' --output text; done   # 0 and 0
+aws cloudwatch describe-alarms --alarm-name-prefix CareerCentralMonitor-dev --query "MetricAlarms[?StateValue=='ALARM'].AlarmName" --output text   # empty
+```
+
+Step 17, the next day: Billing → Bills, under $0.50. **Emergency stop at any point:** `aws lambda put-function-concurrency --function-name "$FN" --reserved-concurrent-executions 0`.
+
+**8. Teardown — DESTRUCTIVE, APPROVAL REQUIRED.** Run in order. The first line reloads the names saved at step 7, in case the session restarted.
+
+```bash
+cd ~/cc/career-central-c1 && eval "$(sed 's/ /\n/g' ~/cc/names.txt)" && echo "B=$B T=$T"
+$CDK destroy --app cdk.out CareerCentralMonitor-dev        # confirm interactively; deletes all but the retained bucket and table
+empty_bucket() {   # deletes every object version and delete marker, 1,000 at a time
+  while :; do
+    aws s3api list-object-versions --bucket "$1" --max-items 1000 --output json > ~/cc/v.json || return 1
+    node -e 'const v=require(process.env.HOME+"/cc/v.json");const o=[...(v.Versions||[]),...(v.DeleteMarkers||[])].slice(0,1000).map(x=>({Key:x.Key,VersionId:x.VersionId}));if(!o.length)process.exit(3);require("fs").writeFileSync(process.env.HOME+"/cc/del.json",JSON.stringify({Objects:o,Quiet:true}))'
+    [ $? -eq 3 ] && break
+    aws s3api delete-objects --bucket "$1" --delete file://$HOME/cc/del.json --query 'length(Errors || `[]`)' --output text
+  done
+}
+empty_bucket "$B" && aws s3api delete-bucket --bucket "$B" && echo "OK bucket deleted"
+aws dynamodb delete-table --table-name "$T" --query TableDescription.TableStatus --output text      # DELETING
+# Optional, once nothing else uses the bootstrap:
+aws cloudformation delete-stack --stack-name CDKToolkit && aws cloudformation wait stack-delete-complete --stack-name CDKToolkit && echo "OK CDKToolkit deleted"
+empty_bucket cdk-hnb659fds-assets-$ACCOUNT-us-east-1 && aws s3api delete-bucket --bucket cdk-hnb659fds-assets-$ACCOUNT-us-east-1   # retained by bootstrap
+aws iam delete-policy --policy-arn arn:aws:iam::$ACCOUNT:policy/CareerCentralDevCfnExec
+aws iam delete-policy --policy-arn arn:aws:iam::$ACCOUNT:policy/CareerCentralDevRoleBoundary
+aws s3api list-buckets --query "Buckets[?starts_with(Name,'careercentralmonitor-dev')||starts_with(Name,'cdk-hnb659fds')].Name" --output text   # empty
+aws dynamodb list-tables --query "TableNames[?starts_with(@,'CareerCentralMonitor-dev')]" --output text                                       # empty
+```
+
+The budget and SCPs remain as account guardrails; removing them is a separate decision.
 
 ## Later stages (each a separate approval)
 
