@@ -1,5 +1,39 @@
 # Verified project state
 
+## CC-017 C1 predeployment review complete; fixture-only dev test proposed — 2026-11-12 (evening)
+
+**C1** (branch `career-central/cc-017-c1`; not merged; nothing provisioned; no AWS account, credentials or GitHub access created). Details and the exception register are in [CC-017](tasks/CC-017.md#c1-predeployment-review-2026-11-12-evening-nothing-provisioned); the proposal is in [AWS_C1](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval).
+
+**Regression analysis.** The "2,570 of 2,574" from the afternoon was 2 failures plus 2 skips. All four are identical on the untouched base `48dc32bb`:
+- Failure: the web `career-central` route has no loading state.
+- Failure: amber status-text contrast at 4.20 and 4.35, against a 4.5 target.
+- Skip: an opt-in browser upload test.
+- Skip: a permission test that skips under root.
+
+None was caused by C1, and none was changed. The full root suite found one genuine C1 regression: the repo-wide `.mjs` scan read the generated Lambda bundle. It is fixed by skipping build-output directories (`dist`, `cdk.out`). A C1 test race between two suites rebuilding `infra/dist/` was fixed by running the infra suite serially.
+
+**Security hardening.**
+- The scheduler trust policy is limited to this account.
+- Lambda async retries are 0 (the Scheduler invokes asynchronously).
+- No CDK metadata resource is deployed.
+
+The fixture-config template has 18 resources, and cdk-nag shows 0 unresolved findings and 5 acknowledged. The Lambda asset is exactly `index.mjs` (3,544,560 B) and `tracker-aliases.json` (697 B). The privacy and credential scan found nothing sensitive; the same two benign hits were checked by context.
+
+**First-deployment tooling.** `infra/scripts/seed-dev-fixture.mjs` seeds, steps, revokes, reads status and probes real conditional semantics, using synthetic data only. It defaults to a dry run and accepts dev targets only.
+
+**Tests (final).**
+- Infra: 25/25, three consecutive runs.
+- Related root and web set: 2,630 tests, 2,626 pass, 2 fail and 2 skip, the same four as the base.
+- Full root suite: 4,789 tests. Every failure either also fails on the base or passes when re-run alone on both trees.
+- Lint (2,097 files), typecheck and production build pass.
+- Browser suites were not run, because Google Chrome is absent from WSL.
+
+**Pilot (read-only check, 15:48 UTC).**
+- 17 ticks, all exit 0, and `submittedApplications` 0 every run. The task is `Ready` and `Enabled` with last result 0. The authorization still expires 2026-11-18 23:39:09 UTC.
+- The 15:44 tick failed all five sources with `provider_unavailable`. Windows logged a Modern Standby exit at 15:44:12, 12 s before that tick, so the network was not up yet; this is the same pattern as 05:40. Backoff applies.
+- Protected files are unchanged since activation (modification-time check).
+- Nothing about the pilot or its task was changed.
+
 ## CC-017 C1 synth-only implementation validated; pilot healthy — 2026-11-12 (afternoon)
 
 **C1 (branch `career-central/cc-017-c1`, worktree; not merged; nothing provisioned, no AWS account used).** The CDK stack, least-privilege IAM, alarms and budget are implemented and validated by synth and tests; see [CC-017](tasks/CC-017.md).

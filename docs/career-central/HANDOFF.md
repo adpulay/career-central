@@ -1,5 +1,19 @@
 # Latest handoff
 
+## C1 ready for the fixture-only dev-test approval — 2026-11-12 (evening)
+
+- **State:** the C1 branch is reviewed for deployment and still unmerged. Do **not** merge it into the live pilot checkout until the user approves; the pilot runs that checkout every 10 minutes.
+- **Proposal:** [AWS_C1 → First deployment](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval) covers the account and region, operator permission sets, resources (18 plus bootstrap), budget, a 17-step test with success criteria, emergency stop, rollback, teardown and data retention.
+- **Approvals needed before step 1:**
+  - The dev account and region.
+  - Identity Center permission sets (bootstrap once; dev operator).
+  - The budget amount and alert address.
+  - `cdk bootstrap` (accepting the default `AdministratorAccess` execution role in that account).
+  - `cdk deploy` of the fixture config.
+  - Running `seed-dev-fixture.mjs --apply`, `probe`, and the manual invocations.
+- **Not part of this test (separate approvals):** schedule, live reads, real-source hand-over, alarm notifications, GitHub OIDC, prod, and merging C1 into the live checkout.
+- **Known unrelated failures**, documented and not changed: the `career-central` web route's missing `loading.tsx`, and amber contrast in `overview.tsx:37`.
+
 ## C1 synth-only stack validated; ready for dev-account approvals — 2026-11-12 (afternoon)
 
 - **C1 branch** `career-central/cc-017-c1` now holds the CDK stack, IAM, alarms and budget, validated by synth, cdk-nag and 20 infra tests; the Lambda asset privacy scan is clean. Three IAM/alarm defects were fixed in this review (see [STATUS](STATUS.md)). The branch is still unmerged and needs review before a fast-forward.
