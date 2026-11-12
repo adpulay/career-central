@@ -5,7 +5,7 @@
 - **Procedure:** fixture-only, `us-east-1`, $5 budget, manual invocations; see [AWS_C1](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval). It now uses a scoped CloudFormation execution policy and a role permissions boundary in place of CDK's default `AdministratorAccess` execution role, plus a scoped operator policy (`infra/policies/`, tested offline).
 - **Verified:**
   - The template has no public endpoint (no Function URL, Lambda permission, API Gateway, load balancer or CloudFront) and no networking resources.
-  - Budget email needs no confirmation click.
+  - ~~Budget email needs no confirmation click.~~ Corrected 2026-11-12: AWS Budgets requires email verification for recipients added from 2026-09-30. A verified (**Active**) recipient is now acceptance step 6a in [AWS_C1](../AWS_C1.md).
   - Teardown covers the versioned bucket, the retained table, the bootstrap and the two managed policies.
 - **Tests:** infra 30/30. Nothing provisioned; the pilot is untouched.
 

@@ -108,10 +108,15 @@ With no VPC there is no NAT gateway or interface endpoint charge. The fixture te
 ### Budget
 
 `budgetLimitUsd` 5 and `budgetEmail` set to the approved address. It emails at 50, 80 and 100 % of actual cost and 100 % of forecast cost.
-- **Email subscription.** AWS Budgets emails the address directly. Unlike an SNS email subscription, there is no confirmation link to click.
-  - Use an address you read; it is stored in the Budget resource and the CloudFormation template.
-  - Allow mail from AWS so the alerts aren't filtered as spam.
-  - Step 6 confirms that the subscriber is registered. No test email can be triggered.
+- **Email verification is required** (AWS Budgets, for recipients added from 2026-09-30; [AWS announcement](https://aws.amazon.com/about-aws/whats-new/2026/10/aws-budgets/), [user guide](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-email-recipients.html)).
+  - When `cdk deploy` creates the budget, AWS sends a verification email to `budgetEmail`. **Only verified addresses receive budget alerts.**
+  - The recipient must open the link while signed in to **this dev account** (the operator's Identity Center console session works).
+  - The link expires after **12 hours**. If it expires, choose **Resend verification** on the budget's detail page (Billing and Cost Management → Budgets → `career-central-dev`).
+  - The detail page shows the recipient as **Pending**, **Active** or **Inactive**. Acceptance requires **Active** (step 6a); Pending or Inactive fails the test.
+  - Re-creating the budget (for example after a teardown and redeploy) adds the recipient again, so plan to verify again.
+  - Use an address you read promptly; it is stored in the Budget resource and the CloudFormation template.
+  - Allow mail from AWS so the verification and alert emails aren't filtered as spam.
+  - No test alert can be triggered. Verification status is the strongest delivery evidence available before real spend.
 - **Billing access.** In a member account, the root user may need to enable *IAM user and role access to Billing information* (Account settings) before an Identity Center role can create or view budgets. Preflight step P4 checks this.
 - **Forecast alerts** need cost history, so in a new account the 100 % forecast alert may not fire for weeks; the actual-cost alerts do.
 - It is an **alert, not a cap**. AWS updates billing data a few times a day, so an alert can lag by hours.
@@ -157,6 +162,7 @@ invoke() { aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-ba
 | # | Action | Success criterion |
 |---|---|---|
 | 6 | Read back the configuration: `aws scheduler get-schedule` (name from `describe-stack-resources`), `aws lambda get-function-configuration --function-name "$FN" --query Environment.Variables`, `aws lambda get-function-event-invoke-config --function-name "$FN"`, `aws s3api get-public-access-block --bucket "$B"`, `aws dynamodb describe-continuous-backups --table-name "$T"`, `aws budgets describe-subscribers-for-notification --account-id "$ACCOUNT" --budget-name career-central-dev --notification NotificationType=ACTUAL,ComparisonOperator=GREATER_THAN,Threshold=50,ThresholdType=PERCENTAGE` | Schedule `DISABLED`; `MONITOR_LIVE_READS=disabled`, `MONITOR_FIXTURE_SOURCES=alpha`; `MaximumRetryAttempts` 0; all four public-access blocks true; PITR `ENABLED`; one `EMAIL` subscriber with the approved address |
+| 6a | Within 12 hours of the deploy, open the AWS Budgets verification email for `budgetEmail` while signed in to the dev account and confirm. Then open Billing and Cost Management → Budgets → `career-central-dev` and read the recipient status (use **Resend verification** if the link expired). | The recipient status is **Active** (verified). **Pending** or **Inactive** fails the test: alerts would reach nobody. Stop here until it is Active. |
 | 7 | `invoke out0.json` **before seeding** | Function error with message `MONITOR_LAMBDA_OBJECT_MISSING`, **not** `AccessDenied`. This proves a missing key reads as 404 under the function role (the `ListBucket` grant). |
 | 8 | `$SEED probe $TARGET` | `passed: true`. Every check holds on the real services: S3 missing key → null, `If-None-Match: *` and stale `If-Match` → 412, current ETag accepted; DynamoDB create-only and stale version → conditional failure, consistent read sees the latest, stale delete refused, probe item removed. |
 | 9 | `$SEED seed $TARGET --hours 2`, then `invoke out1.json`, then `$SEED status $TARGET` | `ok: true`, `polled: 1`; `alertCount` 0 (quiet baseline); `provenance: synthetic` |
