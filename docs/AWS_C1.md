@@ -76,6 +76,68 @@ and reads no user-layer file.
 - **One region** that offers `nodejs24.x` on arm64 and EventBridge Scheduler. `us-east-1` matches the cost estimates in CLOUD_DEPLOYMENT_PLAN §11.
 - **Short-lived credentials only**: an IAM Identity Center (SSO) profile, e.g. `aws sso login --profile cc-dev`. No access keys on disk or in the repository. No GitHub OIDC role for this test.
 
+### Account setup (done by the user; nothing here deploys)
+
+Local state checked 2026-11-12: no AWS CLI in WSL, no `~/.aws` configuration in WSL or Windows, no `AWS_*` environment variables, no cached SSO sessions. The CDK CLI 2.1146.1 is installed in `infra/` (pinned).
+
+**A. AWS Organizations and the dev account (console, as the management account's root or admin).**
+1. In the management account, turn on root MFA and remove any root access keys. If you have no AWS account yet, sign up first; that account becomes the management account and hosts no workloads.
+2. **AWS Organizations** → *Create an organization* (all features).
+3. *Add an AWS account* → *Create an AWS account*: name `career-central-dev`, plus an email address used by no other AWS account. Plus-addressing such as `you+cc-dev@…` works if your provider supports it. Keep the default access role name.
+4. In the new account, recover root via *Forgot password* on its email, then turn on root MFA and create no root access keys. While signed in as that root: **Account** → *IAM user and role access to Billing information* → **Activate**, so the Identity Center roles can create and view the budget (preflight P4).
+
+**B. IAM Identity Center (management account, home region `us-east-1`).**
+1. **IAM Identity Center** → *Enable* (organization instance). Create one user for yourself and require MFA.
+2. Create the permission set **`CareerCentralDevBootstrap`**: AWS managed policy `AdministratorAccess`, session duration 1 hour.
+3. Create the permission set **`CareerCentralDevOperator`**: inline policy = the contents of `infra/policies/dev-operator-policy.json`, session duration 4 hours.
+4. *AWS accounts* → `career-central-dev` → assign your user both permission sets. Remove the bootstrap assignment once P1–P4 pass.
+5. Note the **AWS access portal URL** (`https://<id>.awsapps.com/start`) and the 12-digit `career-central-dev` account id.
+
+**C. AWS CLI v2 in WSL (x86_64), installed by the user.**
+
+```bash
+curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp/awscli && /tmp/awscli/aws/install && rm -rf /tmp/awscli /tmp/awscliv2.zip
+aws --version
+```
+
+**D. SSO profiles** (no secrets: tokens are obtained at login and cached under `~/.aws/sso/cache`). Append to `~/.aws/config`:
+
+```ini
+[sso-session cc]
+sso_start_url = https://<id>.awsapps.com/start
+sso_region = us-east-1
+sso_registration_scopes = sso:account:access
+
+[profile cc-dev-bootstrap]
+sso_session = cc
+sso_account_id = <dev account id>
+sso_role_name = CareerCentralDevBootstrap
+region = us-east-1
+output = json
+
+[profile cc-dev]
+sso_session = cc
+sso_account_id = <dev account id>
+sso_role_name = CareerCentralDevOperator
+region = us-east-1
+output = json
+```
+
+Then sign in with `aws sso login --sso-session cc --use-device-code`. It prints a URL and a code to open in the Windows browser.
+
+**E. Read-only verification (run before approval; prints identities and flags, never credentials).**
+
+| Check | Command | Expected |
+|---|---|---|
+| Operator identity | `aws sts get-caller-identity --profile cc-dev` | `Account` = dev account id; `Arn` contains `AWSReservedSSO_CareerCentralDevOperator` |
+| Bootstrap identity | `aws sts get-caller-identity --profile cc-dev-bootstrap` | Same account; `AWSReservedSSO_CareerCentralDevBootstrap` |
+| Region | `aws configure get region --profile cc-dev` | `us-east-1` |
+| Dedicated member account | `aws organizations describe-organization --profile cc-dev-bootstrap --query Organization.MasterAccountId` | **Not** the dev account id |
+| Root hygiene | `aws iam get-account-summary --profile cc-dev-bootstrap --query 'SummaryMap.[AccountMFAEnabled,AccountAccessKeysPresent]'` | `[1, 0]` |
+| No long-lived keys anywhere | `aws iam list-users --profile cc-dev-bootstrap --query 'length(Users)'`; no `~/.aws/credentials` | `0`; absent |
+| Clean slate | `aws cloudformation describe-stacks --stack-name CDKToolkit --profile cc-dev-bootstrap` and `aws budgets describe-budgets --account-id <id> --profile cc-dev-bootstrap` | Stack does not exist; no budgets (or none named `career-central-dev`) |
+
 ### Permissions (three reviewed policy files in `infra/policies/`, checked offline by `infra/test/dev-policies.test.mjs`)
 
 CDK's default bootstrap gives CloudFormation `AdministratorAccess`. This proposal replaces it with three layers. Every ARN is pinned to `us-east-1` and to the stack's generated-name prefixes: bucket `careercentralmonitor-dev-*`; table, roles, function, log group, schedule and alarms `CareerCentralMonitor-dev-*`; budget `career-central-dev`.
@@ -162,7 +224,7 @@ invoke() { aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-ba
 | # | Action | Success criterion |
 |---|---|---|
 | 6 | Read back the configuration: `aws scheduler get-schedule` (name from `describe-stack-resources`), `aws lambda get-function-configuration --function-name "$FN" --query Environment.Variables`, `aws lambda get-function-event-invoke-config --function-name "$FN"`, `aws s3api get-public-access-block --bucket "$B"`, `aws dynamodb describe-continuous-backups --table-name "$T"`, `aws budgets describe-subscribers-for-notification --account-id "$ACCOUNT" --budget-name career-central-dev --notification NotificationType=ACTUAL,ComparisonOperator=GREATER_THAN,Threshold=50,ThresholdType=PERCENTAGE` | Schedule `DISABLED`; `MONITOR_LIVE_READS=disabled`, `MONITOR_FIXTURE_SOURCES=alpha`; `MaximumRetryAttempts` 0; all four public-access blocks true; PITR `ENABLED`; one `EMAIL` subscriber with the approved address |
-| 6a | Within 12 hours of the deploy, open the AWS Budgets verification email for `budgetEmail` while signed in to the dev account and confirm. Then open Billing and Cost Management → Budgets → `career-central-dev` and read the recipient status (use **Resend verification** if the link expired). | The recipient status is **Active** (verified). **Pending** or **Inactive** fails the test: alerts would reach nobody. Stop here until it is Active. |
+| 6a | Within 12 hours of the deploy, open the AWS Budgets verification email for `budgetEmail` while signed in to the dev account and confirm. Then open Billing and Cost Management → Budgets → `career-central-dev` and read the recipient status (use **Resend verification** if the link expired). If the operator session cannot complete verification (an access error on the budget page), complete it in a short `CareerCentralDevBootstrap` session and record that. | The recipient status is **Active** (verified). **Pending** or **Inactive** fails the test: alerts would reach nobody. Stop here until it is Active. |
 | 7 | `invoke out0.json` **before seeding** | Function error with message `MONITOR_LAMBDA_OBJECT_MISSING`, **not** `AccessDenied`. This proves a missing key reads as 404 under the function role (the `ListBucket` grant). |
 | 8 | `$SEED probe $TARGET` | `passed: true`. Every check holds on the real services: S3 missing key → null, `If-None-Match: *` and stale `If-Match` → 412, current ETag accepted; DynamoDB create-only and stale version → conditional failure, consistent read sees the latest, stale delete refused, probe item removed. |
 | 9 | `$SEED seed $TARGET --hours 2`, then `invoke out1.json`, then `$SEED status $TARGET` | `ok: true`, `polled: 1`; `alertCount` 0 (quiet baseline); `provenance: synthetic` |
