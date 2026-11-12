@@ -7,7 +7,7 @@
   "scripts": {
     "bundle": "node scripts/bundle.mjs",
     "synth": "cdk synth --quiet",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test --test-concurrency=1 test/*.test.mjs"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "3.1159.0",
