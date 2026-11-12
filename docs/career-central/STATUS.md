@@ -1,5 +1,11 @@
 # Verified project state
 
+## CC-017 C1 first fixture-only deployment (user-reported) — 2026-11-12
+
+- **Deployment:** the user reports the fixture-only stack deployed to 978446946447 / us-east-1. Schedule disabled, live reads off, synthetic source only.
+- **Policy change:** `CareerCentralDevCfnExec` was updated in AWS to v2. The change adds `ssm:GetParameters` on `parameter/cdk-bootstrap/hnb659fds/version` only, which CloudFormation needs to resolve `BootstrapVersion`. The repository policy now matches, with regression tests (infra 51/51), and the CloudShell package was rebuilt.
+- **Acceptance steps 6–17 are not yet recorded**, so this is a successful create, not an accepted test. See [AWS_C1 → Deployment record](../AWS_C1.md#deployment-record).
+
 ## CC-017 C1 security review for account 978446946447; CloudShell procedure ready — 2026-11-12 (late)
 
 - **IAM repairs.**

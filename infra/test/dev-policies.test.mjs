@@ -104,3 +104,11 @@ test('operator policy: deploys only through the CDK bootstrap roles and never ed
   for (const action of ['iam:CreateRole', 'iam:PutRolePolicy', 'iam:PassRole', 'cloudformation:CreateStack', 'cloudformation:UpdateStack', 'lambda:UpdateFunctionCode', 'scheduler:UpdateSchedule'])
     assert.ok(!covers(granted, action), `operator cannot ${action} directly`);
 });
+
+test('execution policy: SSM access is exactly ssm:GetParameters on the CDK bootstrap version parameter', () => {
+  const ssm = allows(exec).filter(s => [s.Action].flat().some(a => a.toLowerCase().startsWith('ssm:') || a === '*'));
+  assert.equal(ssm.length, 1, 'one SSM statement');
+  assert.deepEqual({sid: ssm[0].Sid, action: [ssm[0].Action].flat(), resource: [ssm[0].Resource].flat(), condition: ssm[0].Condition},
+    {sid: 'ReadCdkBootstrapVersion', action: ['ssm:GetParameters'], resource: ['arn:aws:ssm:us-east-1:978446946447:parameter/cdk-bootstrap/hnb659fds/version'], condition: undefined});
+  assert.ok(![ssm[0].Resource].flat().some(r => r.includes('*')), 'no wildcard in the parameter ARN');
+});

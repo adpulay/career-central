@@ -236,6 +236,12 @@ Then sign in with `aws sso login --sso-session cc --use-device-code`. It prints 
 
 **S3 Block Public Access.** S3 has no separate IAM action for removing a bucket's public-access block: `DeletePublicAccessBlock` is authorized by `s3:PutBucketPublicAccessBlock`, the same permission CloudFormation needs to set it. That permission is therefore allowed only on the stack's own bucket, and the protection against weakening it is **account-level** Block Public Access (G2), which overrides every bucket-level setting. Only the admin session can change it (SCP), and the CloudFormation policy explicitly denies it. No policy allows bucket or object ACL writes, and the bucket has ACLs disabled (`BucketOwnerEnforced`) and a Deny-only bucket policy.
 
+**CDK bootstrap version parameter.** Every CDK template declares a `BootstrapVersion` parameter of type `AWS::SSM::Parameter::Value<String>`. CloudFormation resolves it with the execution role, so `CareerCentralDevCfnExec` allows exactly `ssm:GetParameters` on `arn:aws:ssm:us-east-1:978446946447:parameter/cdk-bootstrap/hnb659fds/version`, statement `ReadCdkBootstrapVersion`.
+- This was missing from the first version and was found in the real deployment. The live policy was updated to v2.
+- It grants no other SSM action, parameter, account or Region. `GetParametersByPath` and Session Manager are also outside the SCP allowlist.
+- A policy created from the current file already includes it.
+- The policy is 5,739 of IAM's 6,144-character managed-policy limit, so further additions need consolidation first.
+
 CDK's default bootstrap gives CloudFormation `AdministratorAccess`. This proposal replaces it with three layers. Every ARN is pinned to `us-east-1` and to the stack's generated-name prefixes: bucket `careercentralmonitor-dev-*`; table, roles, function, log group, schedule and alarms `CareerCentralMonitor-dev-*`; budget `career-central-dev`.
 
 | Policy | Attached to | What it allows |
@@ -522,6 +528,24 @@ aws dynamodb list-tables --query "TableNames[?starts_with(@,'CareerCentralMonito
 ```
 
 The budget and SCPs remain as account guardrails; removing them is a separate decision.
+
+## Deployment record
+
+### 2026-11-12 — first fixture-only deployment to 978446946447 / us-east-1 (user-reported)
+
+- **Result:** the fixture-only stack `CareerCentralMonitor-dev` deployed successfully from CloudShell, as reported by the user.
+  - Configuration from the package: schedule DISABLED, live employer reads disabled, synthetic source `alpha` only, role permissions boundary on, no stack budget (the account guardrail budget applies).
+- **Change made in AWS during the deployment:** `CareerCentralDevCfnExec` is now on **v2**, adding `ssm:GetParameters` on the bootstrap version parameter only (see Permissions). The repository file matches this as of commit "C1: CloudFormation reads the CDK bootstrap version parameter". Confirm the live default version matches it (read-only):
+
+  ```bash
+  aws iam get-policy --policy-arn arn:aws:iam::978446946447:policy/CareerCentralDevCfnExec --query Policy.DefaultVersionId --output text   # v2
+  aws iam get-policy-version --policy-arn arn:aws:iam::978446946447:policy/CareerCentralDevCfnExec --version-id v2 --query PolicyVersion.Document --output json > live.json
+  node -e 'const n=d=>JSON.stringify(d.Statement.map(s=>({...s,Action:[s.Action].flat().sort(),Resource:[s.Resource].flat().sort()})));console.log(n(require("./live.json"))===n(require(process.argv[1]))?"OK live v2 == repo":"STOP: live policy differs from repo")' "$HOME/cc/career-central-c1/policies/dev-cfn-execution-policy.json"
+  ```
+
+  The CloudShell copy at `~/cc/career-central-c1` predates this change. Upload the rebuilt package before comparing.
+- **Not recorded yet:** the results of acceptance steps 6–17 (configuration read-back, budget recipient Active, the pre-seed 404 check, probe, quiet baseline, one alert, no duplicate, concurrency, simulator, revoke, log scan, alarms, next-day bill). Record each outcome here when run. Until then, the deployment is a successful create, not an accepted test.
+- **Still not enabled, each a separate approval:** the EventBridge schedule, live employer reads, real sources, alarm notifications, GitHub OIDC, prod.
 
 ## Later stages (each a separate approval)
 

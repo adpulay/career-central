@@ -26,6 +26,12 @@
       "Condition": {"StringEquals": {"kms:ViaService": "s3.us-east-1.amazonaws.com"}}
     },
     {
+      "Sid": "ReadCdkBootstrapVersion",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameters",
+      "Resource": "arn:aws:ssm:us-east-1:978446946447:parameter/cdk-bootstrap/hnb659fds/version"
+    },
+    {
       "Sid": "MonitorTable",
       "Effect": "Allow",
       "Action": ["dynamodb:CreateTable", "dynamodb:UpdateTable", "dynamodb:UpdateContinuousBackups", "dynamodb:TagResource", "dynamodb:UntagResource",

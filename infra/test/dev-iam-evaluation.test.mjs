@@ -172,3 +172,22 @@ test('SCPs: CloudShell works for the admin session in us-east-1 only; admin sess
     ['iam:PutRolePolicy', ARN.execRole, {'aws:PrincipalArn': ARN.deployRole, 'aws:RequestedRegion': R}, 'explicitDeny'],
   ]);
 });
+
+test('CloudFormation role reads only the CDK bootstrap version parameter (live CareerCentralDevCfnExec v2)', () => {
+  const param = name => `arn:aws:ssm:${R}:${A}:parameter${name}`;
+  check(cfn, [
+    // CloudFormation resolves the template's BootstrapVersion SSM parameter with the execution role.
+    ['ssm:GetParameters', param('/cdk-bootstrap/hnb659fds/version'), ctx(), 'allowed'],
+    ['ssm:GetParameters', param('/cdk-bootstrap/hnb659fds/other'), ctx(), 'implicitDeny'],
+    ['ssm:GetParameters', param('/cdk-bootstrap/otherqualifier/version'), ctx(), 'implicitDeny'],
+    ['ssm:GetParameters', param('/career-central/secret'), ctx(), 'implicitDeny'],
+    ['ssm:GetParameters', `arn:aws:ssm:${R}:${OTHER}:parameter/cdk-bootstrap/hnb659fds/version`, ctx(), 'implicitDeny'],
+    ['ssm:GetParameters', `arn:aws:ssm:us-west-2:${A}:parameter/cdk-bootstrap/hnb659fds/version`, ctx({'aws:RequestedRegion': 'us-west-2'}), 'explicitDeny'],
+    ['ssm:GetParameter', param('/cdk-bootstrap/hnb659fds/version'), ctx(), 'implicitDeny'],
+    ['ssm:GetParametersByPath', param('/cdk-bootstrap/hnb659fds'), ctx(), 'explicitDeny'], // outside the SCP allowlist
+    ['ssm:PutParameter', param('/cdk-bootstrap/hnb659fds/version'), ctx(), 'implicitDeny'],
+    ['ssm:DeleteParameter', param('/cdk-bootstrap/hnb659fds/version'), ctx(), 'implicitDeny'],
+    ['ssm:DescribeParameters', '*', ctx(), 'implicitDeny'],
+    ['ssm:StartSession', '*', ctx(), 'explicitDeny'],
+  ]);
+});
