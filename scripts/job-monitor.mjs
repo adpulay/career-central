@@ -36,7 +36,7 @@ async function main() {
     if (!values['authorize-live-read']) throw fail('MONITOR_LIVE_NOT_AUTHORIZED');
     const controller = new AbortController();
     const stop = () => controller.abort(); process.once('SIGINT', stop); process.once('SIGTERM', stop);
-    try {return await runMonitorTick({root, context: loadMatchingContext(root), fetchSnapshot: createFeedReader(), authorizeLiveRead: true, signal: controller.signal});}
+    try {return await runMonitorTick({root, context: await loadMatchingContext(root), fetchSnapshot: createFeedReader(), authorizeLiveRead: true, signal: controller.signal});}
     finally {process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);}
   }
   if (command === 'schedule') return setMonitorInterval(root, values.source, Number(values.minutes));
@@ -45,7 +45,7 @@ async function main() {
     if (!values['authorize-live-read']) throw fail('MONITOR_LIVE_NOT_AUTHORIZED');
     const controller = new AbortController();
     const stop = () => controller.abort(); process.once('SIGINT', stop); process.once('SIGTERM', stop);
-    try {return await pollSource({root, sourceId: values.source, context: loadMatchingContext(root), fetchSnapshot: createFeedReader(),
+    try {return await pollSource({root, sourceId: values.source, context: await loadMatchingContext(root), fetchSnapshot: createFeedReader(),
       mode: 'live', authorizeLiveRead: true, signal: controller.signal, requireFirstLiveBaseline: command === 'first-poll'});}
     finally {process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);}
   }

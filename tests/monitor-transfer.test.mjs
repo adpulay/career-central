@@ -68,3 +68,32 @@ test('ownership handover: exactly one side polls a source; handing back restores
   const back = await poll(local, 'alpha', [job('alpha', '1')], now + 3 * hour);
   assert.equal(back.state, 'healthy'); assert.equal(back.alerts, 0);
 }));
+
+test('export/import preserves checkpoints, first-seen timestamps and versions, and never touches application history', () => withRoot(async root => {
+  const {updateLedger} = await import('../lib/applications/store.mjs');
+  await updateLedger(root, ledger => {ledger.jobs.k1 = {key: 'k1', company: 'Fictional', status: 'Submitted'}; ledger.events.push({id: 'e1', jobKey: 'k1', to: 'Submitted'}); ledger.reviewedMailSends = {s1: {status: 'sent'}};});
+  const ledgerFile = path.join(root, 'data/application-automation/ledger.json'), ledgerBefore = fs.readFileSync(ledgerFile);
+  const local = fileMonitorStore(root);
+  await configureSources(local, [src('alpha')]);
+  await poll(local, 'alpha', [job('alpha', '1')], now); await poll(local, 'alpha', [job('alpha', '1'), job('alpha', '2')], now + hour);
+  const source = readMonitor(local);
+  const target = cloud(), bundle = await exportMonitorBundle(local, {sourceIds: ['alpha'], now: now + 2 * hour});
+  await importMonitorBundle(target, bundle, {dryRun: false});
+  await importMonitorBundle(target, bundle, {dryRun: false}); // idempotent second import
+  const after = await target.load();
+  assert.deepEqual(after.sources.alpha.checkpoint, source.sources.alpha.checkpoint, 'checkpoint preserved');
+  assert.equal(after.sources.alpha.lastSuccessAt, source.sources.alpha.lastSuccessAt);
+  for (const [id, posting] of Object.entries(source.postings)) {
+    assert.equal(after.postings[id].firstSeenAt, posting.firstSeenAt, 'first-seen preserved');
+    assert.equal(after.postings[id].version, posting.version); assert.equal(after.postings[id].contentHash, posting.contentHash);
+  }
+  assert.equal(Object.keys(after.alerts).length, 1, 'no alert duplicated by re-import');
+  // Back again (cloud -> fresh local root) round-trips to the same content.
+  await withRoot(async root2 => {
+    const back = fileMonitorStore(root2);
+    await importMonitorBundle(back, await exportMonitorBundle(target, {sourceIds: ['alpha'], now: now + 3 * hour}), {dryRun: false});
+    assert.deepEqual(readMonitor(back).postings, source.postings); assert.deepEqual(readMonitor(back).alerts, source.alerts);
+    assert.equal(fs.existsSync(path.join(root2, 'data/application-automation/ledger.json')), false, 'import never creates application records');
+  });
+  assert.deepEqual(fs.readFileSync(ledgerFile), ledgerBefore, 'application/email ledger byte-identical');
+}));
