@@ -90,12 +90,6 @@
       "Resource": "arn:aws:cloudwatch:us-east-1:*:alarm:CareerCentralMonitor-dev-*"
     },
     {
-      "Sid": "Budget",
-      "Effect": "Allow",
-      "Action": ["budgets:ModifyBudget", "budgets:ViewBudget", "budgets:TagResource", "budgets:UntagResource", "budgets:ListTagsForResource"],
-      "Resource": "arn:aws:budgets::*:budget/career-central-dev"
-    },
-    {
       "Sid": "NoPublicEndpointsOrNetworking",
       "Effect": "Deny",
       "Action": ["lambda:CreateFunctionUrlConfig", "lambda:UpdateFunctionUrlConfig", "lambda:AddPermission", "s3:PutBucketAcl",

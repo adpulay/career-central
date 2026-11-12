@@ -25,7 +25,9 @@ function synth(overrides = {}) {
   Validations.of(app).addPlugins(new AwsSolutionsChecks(app)); app.synth();
   return Template.fromStack(stack).toJSON();
 }
-const deployed = synth({permissionsBoundaryName: BOUNDARY});
+// The dev deployment context: boundary on, and the account-level guardrail budget
+// (created and verified before deployment) instead of a stack budget.
+const deployed = synth({permissionsBoundaryName: BOUNDARY, stackBudget: false, accountBudgetName: 'career-central-dev-guardrail'});
 const allows = doc => doc.Statement.filter(s => s.Effect === 'Allow');
 const actionsOf = doc => new Set(allows(doc).flatMap(s => [s.Action].flat()));
 const covers = (granted, action) => [...granted].some(g => g === action || (g.endsWith('*') && action.startsWith(g.slice(0, -1))));
@@ -57,8 +59,9 @@ test('execution policy can create exactly the resource types the stack contains'
   }
   for (const missing of ['dynamodb:DeleteTable', 's3:DeleteBucket', 'iam:AttachRolePolicy', 'lambda:AddPermission', 'lambda:CreateFunctionUrlConfig'])
     assert.ok(!covers(granted, missing), `${missing} is not granted (retained data; no managed policies; no public endpoints)`);
-  const budget = Object.values(deployed.Resources).find(r => r.Type === 'AWS::Budgets::Budget').Properties.Budget.BudgetName;
-  assert.ok(allows(exec).find(s => s.Sid === 'Budget').Resource.endsWith(`budget/${budget}`));
+  // Budgets are managed only by the admin session (the SCP reserves budgets:ModifyBudget for it).
+  assert.equal(Object.values(deployed.Resources).filter(r => r.Type === 'AWS::Budgets::Budget').length, 0);
+  assert.ok(!covers(granted, 'budgets:ModifyBudget'), 'CloudFormation cannot create, change or delete budgets');
 });
 
 test('execution policy: roles only with the boundary; pass roles only to Lambda and Scheduler; public endpoints denied', () => {

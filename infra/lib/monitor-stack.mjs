@@ -17,6 +17,7 @@ import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as budgets from 'aws-cdk-lib/aws-budgets';
 
 export const METRIC_NAMESPACE = 'CareerCentral/Monitor';
+export const TABLE_MAX_REQUEST_UNITS = 10;
 
 export class MonitorStack extends Stack {
   constructor(scope, id, {config, bundleDir, ...props}) {
@@ -37,6 +38,9 @@ export class MonitorStack extends Stack {
       partitionKey: {name: 'pk', type: dynamodb.AttributeType.STRING}, sortKey: {name: 'sk', type: dynamodb.AttributeType.STRING},
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, encryption: dynamodb.TableEncryption.AWS_MANAGED,
       pointInTimeRecoverySpecification: {pointInTimeRecoveryEnabled: true}, deletionProtection: prod, removalPolicy: RemovalPolicy.RETAIN,
+      // On-demand ceiling: a runaway caller is throttled instead of billed without limit.
+      // A tick makes a few dozen small requests, so this leaves wide headroom.
+      maxReadRequestUnits: TABLE_MAX_REQUEST_UNITS, maxWriteRequestUnits: TABLE_MAX_REQUEST_UNITS,
     });
     const logGroup = new logs.LogGroup(this, 'MonitorTickLogs', {retention: config.logRetentionDays, removalPolicy: RemovalPolicy.DESTROY});
 
@@ -94,8 +98,9 @@ export class MonitorStack extends Stack {
       alarm('AuthorizationExpiring', custom('AuthorizationHoursRemaining', 'Minimum'), 24, 1, LT);
     }
 
-    // Budget alerts (not a hard cap): 50/80/100 % actual and 100 % forecast.
-    new budgets.CfnBudget(this, 'MonitorBudget', {
+    // Budget alerts (not a hard cap): 50/80/100 % actual and 100 % forecast. Skipped when an
+    // account-level budget, created and verified before any deployment, guards the account.
+    if (config.stackBudget) new budgets.CfnBudget(this, 'MonitorBudget', {
       budget: {budgetName: `career-central-${env}`, budgetType: 'COST', timeUnit: 'MONTHLY', budgetLimit: {amount: config.budgetLimitUsd, unit: 'USD'}},
       notificationsWithSubscribers: [[50, 'ACTUAL'], [80, 'ACTUAL'], [100, 'ACTUAL'], [100, 'FORECASTED']].map(([threshold, notificationType]) => ({
         notification: {comparisonOperator: 'GREATER_THAN', notificationType, threshold, thresholdType: 'PERCENTAGE'},

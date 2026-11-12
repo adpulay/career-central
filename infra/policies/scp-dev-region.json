@@ -1,0 +1,16 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyAllRegionsExceptUsEast1",
+      "Effect": "Deny",
+      "NotAction": [
+        "account:*", "aws-portal:*", "billing:*", "budgets:*", "ce:*", "consolidatedbilling:*", "cur:*", "freetier:*",
+        "health:*", "iam:*", "invoicing:*", "notifications:*", "notifications-contacts:*", "organizations:*", "payments:*",
+        "pricing:*", "sso:*", "sso-directory:*", "identitystore:*", "sts:*", "support:*", "tax:*", "trustedadvisor:*"
+      ],
+      "Resource": "*",
+      "Condition": {"StringNotEquals": {"aws:RequestedRegion": ["us-east-1"]}}
+    }
+  ]
+}

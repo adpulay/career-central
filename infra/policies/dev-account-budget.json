@@ -1,0 +1,6 @@
+{
+  "BudgetName": "career-central-dev-guardrail",
+  "BudgetType": "COST",
+  "TimeUnit": "MONTHLY",
+  "BudgetLimit": {"Amount": "5", "Unit": "USD"}
+}
