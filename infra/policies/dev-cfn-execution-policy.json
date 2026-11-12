@@ -1,0 +1,107 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "MonitorBucket",
+      "Effect": "Allow",
+      "Action": ["s3:CreateBucket", "s3:PutBucketPublicAccessBlock", "s3:PutEncryptionConfiguration", "s3:PutBucketVersioning",
+        "s3:PutLifecycleConfiguration", "s3:PutBucketOwnershipControls", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutBucketTagging",
+        "s3:GetBucket*", "s3:GetEncryptionConfiguration", "s3:GetLifecycleConfiguration", "s3:GetAccelerateConfiguration",
+        "s3:GetReplicationConfiguration", "s3:GetAnalyticsConfiguration", "s3:GetInventoryConfiguration", "s3:GetMetricsConfiguration",
+        "s3:GetIntelligentTieringConfiguration", "s3:ListBucket"],
+      "Resource": "arn:aws:s3:::careercentralmonitor-dev-*"
+    },
+    {
+      "Sid": "LambdaCodeFromStagingBucket",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+      "Resource": "arn:aws:s3:::cdk-hnb659fds-assets-*-us-east-1/*"
+    },
+    {
+      "Sid": "MonitorTable",
+      "Effect": "Allow",
+      "Action": ["dynamodb:CreateTable", "dynamodb:UpdateTable", "dynamodb:UpdateContinuousBackups", "dynamodb:TagResource", "dynamodb:UntagResource",
+        "dynamodb:DescribeTable", "dynamodb:DescribeContinuousBackups", "dynamodb:DescribeTimeToLive", "dynamodb:DescribeContributorInsights",
+        "dynamodb:DescribeKinesisStreamingDestination", "dynamodb:ListTagsOfResource"],
+      "Resource": "arn:aws:dynamodb:us-east-1:*:table/CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "TableAwsManagedKeyViaDynamoDB",
+      "Effect": "Allow",
+      "Action": ["kms:DescribeKey", "kms:CreateGrant"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"kms:ViaService": "dynamodb.us-east-1.amazonaws.com"}}
+    },
+    {
+      "Sid": "FunctionLogGroup",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy",
+        "logs:TagResource", "logs:UntagResource", "logs:TagLogGroup", "logs:ListTagsForResource", "logs:ListTagsLogGroup"],
+      "Resource": ["arn:aws:logs:us-east-1:*:log-group:CareerCentralMonitor-dev-*", "arn:aws:logs:us-east-1:*:log-group:CareerCentralMonitor-dev-*:*"]
+    },
+    {
+      "Sid": "DescribeLogGroups",
+      "Effect": "Allow",
+      "Action": "logs:DescribeLogGroups",
+      "Resource": "arn:aws:logs:us-east-1:*:log-group:*"
+    },
+    {
+      "Sid": "CreateRolesOnlyWithBoundary",
+      "Effect": "Allow",
+      "Action": ["iam:CreateRole", "iam:PutRolePolicy"],
+      "Resource": "arn:aws:iam::*:role/CareerCentralMonitor-dev-*",
+      "Condition": {"StringLike": {"iam:PermissionsBoundary": "arn:aws:iam::*:policy/CareerCentralDevRoleBoundary"}}
+    },
+    {
+      "Sid": "ManageStackRoles",
+      "Effect": "Allow",
+      "Action": ["iam:DeleteRole", "iam:DeleteRolePolicy", "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies", "iam:TagRole", "iam:UntagRole", "iam:UpdateAssumeRolePolicy", "iam:UpdateRoleDescription"],
+      "Resource": "arn:aws:iam::*:role/CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "PassStackRolesToLambdaAndScheduler",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/CareerCentralMonitor-dev-*",
+      "Condition": {"StringEquals": {"iam:PassedToService": ["lambda.amazonaws.com", "scheduler.amazonaws.com"]}}
+    },
+    {
+      "Sid": "MonitorFunction",
+      "Effect": "Allow",
+      "Action": ["lambda:CreateFunction", "lambda:DeleteFunction", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
+        "lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:GetFunctionCodeSigningConfig", "lambda:GetRuntimeManagementConfig",
+        "lambda:ListTags", "lambda:TagResource", "lambda:UntagResource",
+        "lambda:PutFunctionEventInvokeConfig", "lambda:UpdateFunctionEventInvokeConfig", "lambda:DeleteFunctionEventInvokeConfig",
+        "lambda:GetFunctionEventInvokeConfig", "lambda:PutFunctionConcurrency", "lambda:DeleteFunctionConcurrency"],
+      "Resource": "arn:aws:lambda:us-east-1:*:function:CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "DisabledSchedule",
+      "Effect": "Allow",
+      "Action": ["scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:DeleteSchedule", "scheduler:GetSchedule"],
+      "Resource": "arn:aws:scheduler:us-east-1:*:schedule/default/CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "Alarms",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:DescribeAlarms",
+        "cloudwatch:TagResource", "cloudwatch:UntagResource", "cloudwatch:ListTagsForResource"],
+      "Resource": "arn:aws:cloudwatch:us-east-1:*:alarm:CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "Budget",
+      "Effect": "Allow",
+      "Action": ["budgets:ModifyBudget", "budgets:ViewBudget", "budgets:TagResource", "budgets:UntagResource", "budgets:ListTagsForResource"],
+      "Resource": "arn:aws:budgets::*:budget/career-central-dev"
+    },
+    {
+      "Sid": "NoPublicEndpointsOrNetworking",
+      "Effect": "Deny",
+      "Action": ["lambda:CreateFunctionUrlConfig", "lambda:UpdateFunctionUrlConfig", "lambda:AddPermission", "s3:PutBucketAcl",
+        "s3:DeleteBucketPublicAccessBlock", "s3:PutAccountPublicAccessBlock", "iam:PutRolePermissionsBoundary", "iam:DeleteRolePermissionsBoundary",
+        "iam:AttachRolePolicy", "iam:CreateUser", "iam:CreateAccessKey", "ec2:*", "apigateway:*", "elasticloadbalancing:*", "cloudfront:*"],
+      "Resource": "*"
+    }
+  ]
+}

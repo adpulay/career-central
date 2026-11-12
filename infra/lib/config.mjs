@@ -17,7 +17,11 @@ export function monitorConfig(input = {}) {
     fixtureSources: Array.isArray(input.fixtureSources) ? input.fixtureSources : String(input.fixtureSources ?? '').split(',').map(s => s.trim()).filter(Boolean),
     reservedConcurrency: input.reservedConcurrency === undefined || input.reservedConcurrency === '' ? undefined : Number(input.reservedConcurrency),
     confirmProduction: input.confirmProduction === true || input.confirmProduction === 'true',
+    // Name of a pre-created customer-managed policy applied as the permissions
+    // boundary of every role in the stack (infra/policies/dev-role-boundary.json).
+    permissionsBoundaryName: input.permissionsBoundaryName || undefined,
   };
+  if (c.permissionsBoundaryName !== undefined && !/^[A-Za-z0-9+=,.@_-]{1,128}$/.test(c.permissionsBoundaryName)) fail('permissionsBoundaryName must be an IAM policy name');
   if (!['dev', 'prod'].includes(c.environment)) fail('environment must be dev or prod');
   if (!Number.isFinite(c.budgetLimitUsd) || c.budgetLimitUsd <= 0 || c.budgetLimitUsd > 100) fail('budgetLimitUsd must be in (0, 100]');
   if (typeof c.budgetEmail !== 'string' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.budgetEmail)) fail('budgetEmail is required (budget alerts are mandatory)');

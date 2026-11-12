@@ -23,6 +23,9 @@ export class MonitorStack extends Stack {
     super(scope, id, props);
     const env = config.environment, prod = env === 'prod';
     for (const [key, value] of Object.entries({project: 'career-central', environment: env, component: 'monitor', 'cost-center': 'personal'})) Tags.of(this).add(key, value);
+    // A boundary caps every role this stack creates, whatever its inline policy says; the
+    // narrow CloudFormation execution policy only allows creating roles that carry it.
+    if (config.permissionsBoundaryName) iam.PermissionsBoundary.of(this).apply(iam.ManagedPolicy.fromManagedPolicyName(this, 'RoleBoundary', config.permissionsBoundaryName));
 
     const bucket = new s3.Bucket(this, 'MonitorBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL, encryption: s3.BucketEncryption.S3_MANAGED, enforceSSL: true,

@@ -1,0 +1,73 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CdkDeployThroughBootstrapRoles",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": ["arn:aws:iam::*:role/cdk-hnb659fds-deploy-role-*-us-east-1", "arn:aws:iam::*:role/cdk-hnb659fds-file-publishing-role-*-us-east-1",
+        "arn:aws:iam::*:role/cdk-hnb659fds-lookup-role-*-us-east-1"]
+    },
+    {
+      "Sid": "ReadStacks",
+      "Effect": "Allow",
+      "Action": ["cloudformation:DescribeStacks", "cloudformation:DescribeStackResources", "cloudformation:DescribeStackEvents"],
+      "Resource": ["arn:aws:cloudformation:us-east-1:*:stack/CareerCentralMonitor-dev/*", "arn:aws:cloudformation:us-east-1:*:stack/CDKToolkit/*"]
+    },
+    {
+      "Sid": "InvokeInspectAndStopFunction",
+      "Effect": "Allow",
+      "Action": ["lambda:InvokeFunction", "lambda:GetFunctionConfiguration", "lambda:GetFunctionEventInvokeConfig",
+        "lambda:PutFunctionConcurrency", "lambda:DeleteFunctionConcurrency"],
+      "Resource": "arn:aws:lambda:us-east-1:*:function:CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "InspectSchedule",
+      "Effect": "Allow",
+      "Action": "scheduler:GetSchedule",
+      "Resource": "arn:aws:scheduler:us-east-1:*:schedule/default/CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "BucketInspectSeedAndTeardown",
+      "Effect": "Allow",
+      "Action": ["s3:GetBucketPublicAccessBlock", "s3:GetEncryptionConfiguration", "s3:GetBucketVersioning", "s3:ListBucket", "s3:ListBucketVersions", "s3:DeleteBucket"],
+      "Resource": "arn:aws:s3:::careercentralmonitor-dev-*"
+    },
+    {
+      "Sid": "ObjectsSeedProbeAndTeardown",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "Resource": "arn:aws:s3:::careercentralmonitor-dev-*/*"
+    },
+    {
+      "Sid": "TableSeedProbeInspectAndTeardown",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:DescribeTable", "dynamodb:DescribeContinuousBackups", "dynamodb:DeleteTable"],
+      "Resource": "arn:aws:dynamodb:us-east-1:*:table/CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "ListForOrphanCheck",
+      "Effect": "Allow",
+      "Action": ["s3:ListAllMyBuckets", "dynamodb:ListTables"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AlarmsAndLogs",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:DescribeAlarms", "logs:FilterLogEvents"],
+      "Resource": ["arn:aws:cloudwatch:us-east-1:*:alarm:CareerCentralMonitor-dev-*", "arn:aws:logs:us-east-1:*:log-group:CareerCentralMonitor-dev-*", "arn:aws:logs:us-east-1:*:log-group:CareerCentralMonitor-dev-*:*"]
+    },
+    {
+      "Sid": "SimulateStackRoles",
+      "Effect": "Allow",
+      "Action": ["iam:SimulatePrincipalPolicy", "iam:GetContextKeysForPrincipalPolicy"],
+      "Resource": "arn:aws:iam::*:role/CareerCentralMonitor-dev-*"
+    },
+    {
+      "Sid": "ViewBudget",
+      "Effect": "Allow",
+      "Action": "budgets:ViewBudget",
+      "Resource": "arn:aws:budgets::*:budget/*"
+    }
+  ]
+}
