@@ -17,6 +17,9 @@ test('bundle builds within limits with pinned SDK, runtime assets and stubbed ma
   const report = await bundle();
   assert.deepEqual(report.forbidden, []); assert.ok(report.bytes < MAX_BUNDLE_BYTES, `${report.bytes} bytes`);
   assert.equal(report.mainGuardStubbed, true); assert.equal(report.sdkPinned, true);
+  assert.deepEqual(report.unexpectedFiles, [], 'the deployed asset directory holds only the bundle and runtime assets');
+  const deployed = fs.readdirSync(path.dirname(report.outfile)).map(name => fs.readFileSync(path.join(path.dirname(report.outfile), name), 'utf8')).join('\n');
+  assert.doesNotMatch(deployed, /\/home\/[^/\s"']+\/|[A-Za-z]:\\Users\\/, 'no local absolute paths ship to Lambda');
   for (const asset of report.assets) assert.ok(fs.existsSync(path.join(path.dirname(report.outfile), asset)), `${asset} packaged`);
 });
 

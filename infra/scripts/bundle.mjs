@@ -36,17 +36,24 @@ export async function bundle({write = true} = {}) {
   const forbidden = inputs.filter(input => FORBIDDEN.some(pattern => pattern.test(input.replaceAll('\\', '/'))));
   const bytes = Object.values(result.metafile.outputs)[0].bytes;
   if (write) for (const asset of RUNTIME_ASSETS) fs.copyFileSync(path.join(infra, '..', asset), path.join(path.dirname(outfile), asset));
+  // CDK packages the whole directory, so anything else in it would ship to Lambda.
+  // Fail closed instead of deleting: the operator removes stray files deliberately.
+  const assetDir = path.dirname(outfile), allowed = new Set([path.basename(outfile), ...RUNTIME_ASSETS]);
+  const unexpectedFiles = write ? fs.readdirSync(assetDir).filter(name => !allowed.has(name)).sort() : [];
   const mainGuardStubbed = inputs.includes('cc-lambda:is-main-module') && !inputs.some(input => input.endsWith('lib/is-main-module.mjs'));
-  return {outfile, bytes, inputs: inputs.length, forbidden, assets: RUNTIME_ASSETS, mainGuardStubbed, sdkPinned: inputs.some(input => input.includes('@aws-sdk/client-s3'))};
+  return {outfile, bytes, unexpectedFiles, inputs: inputs.length, forbidden, assets: RUNTIME_ASSETS, mainGuardStubbed, sdkPinned: inputs.some(input => input.includes('@aws-sdk/client-s3'))};
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const report = await bundle();
   if (report.forbidden.length) {console.error('Forbidden modules in bundle:', report.forbidden); process.exit(1);}
+  if (report.unexpectedFiles.length) {console.error(`Unexpected files in ${path.relative(infra, path.dirname(report.outfile))} (would be deployed; remove them and rebuild):`, report.unexpectedFiles); process.exit(1);}
   if (report.bytes > MAX_BUNDLE_BYTES) {console.error(`Bundle too large: ${report.bytes} bytes`); process.exit(1);}
   if (!report.mainGuardStubbed) {console.error('Main-module guard not stubbed'); process.exit(1);}
   const built = await import(pathToFileURL(report.outfile).href);
   if (typeof built.handler !== 'function' || typeof built.createLambdaHandler !== 'function') {console.error('Bundle exports missing'); process.exit(1);}
-  fs.writeFileSync(path.join(infra, 'dist/monitor-tick/bundle-report.json'), JSON.stringify(report, null, 2) + '\n');
+  // Written beside, not inside, the deployed asset directory, and with a relative
+  // path: nothing local (paths, usernames) ships to Lambda.
+  fs.writeFileSync(path.join(infra, 'dist/bundle-report.json'), JSON.stringify({...report, outfile: path.relative(infra, report.outfile)}, null, 2) + '\n');
   console.log(JSON.stringify({...report, outfile: path.relative(infra, report.outfile)}));
 }
