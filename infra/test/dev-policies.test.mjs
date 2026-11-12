@@ -44,7 +44,13 @@ test('every policy: valid, Allow statements name exact services, us-east-1 only,
     }
   }
   const unscopedAllows = [...allows(operator), ...allows(exec)].filter(s => [s.Resource].flat().includes('*')).flatMap(s => [s.Action].flat()).sort();
-  assert.deepEqual(unscopedAllows, ['dynamodb:ListTables', 'kms:CreateGrant', 'kms:DescribeKey', 's3:ListAllMyBuckets']);
+  assert.deepEqual(unscopedAllows, ['dynamodb:ListTables', 's3:ListAllMyBuckets']);
+  // Every ARN that has an account field names the development account, never a wildcard.
+  for (const doc of [exec, boundary, operator]) for (const s of allows(doc)) for (const arn of [s.Resource].flat().filter(r => r !== '*' && !r.startsWith('arn:aws:s3:::')))
+    assert.match(arn, /^arn:aws:[a-z0-9-]+:(us-east-1)?:978446946447:/, `${s.Sid}: ${arn}`);
+  // S3 ARNs carry no account, so S3 object and bucket access in the boundary and operator policy is pinned by aws:ResourceAccount.
+  for (const doc of [boundary, operator]) for (const s of allows(doc).filter(s => [s.Resource].flat().some(r => r.startsWith('arn:aws:s3:::'))))
+    assert.deepEqual(s.Condition, {StringEquals: {'aws:ResourceAccount': '978446946447'}}, s.Sid);
 });
 
 test('execution policy can create exactly the resource types the stack contains', () => {
@@ -65,13 +71,19 @@ test('execution policy can create exactly the resource types the stack contains'
 });
 
 test('execution policy: roles only with the boundary; pass roles only to Lambda and Scheduler; public endpoints denied', () => {
-  const create = exec.Statement.find(s => s.Sid === 'CreateRolesOnlyWithBoundary');
-  assert.deepEqual([create.Action].flat().sort(), ['iam:CreateRole', 'iam:PutRolePolicy']);
-  assert.match(create.Condition.StringLike['iam:PermissionsBoundary'], new RegExp(`:policy/${BOUNDARY}$`));
-  assert.ok(!allows(exec).filter(s => s !== create).some(s => covers(new Set([s.Action].flat()), 'iam:CreateRole') || covers(new Set([s.Action].flat()), 'iam:PutRolePolicy')), 'no unconditioned role creation');
+  const boundaryArn = `arn:aws:iam::978446946447:policy/${BOUNDARY}`, roleActions = ['iam:CreateRole', 'iam:PutRolePermissionsBoundary', 'iam:PutRolePolicy'];
+  const create = exec.Statement.find(s => s.Sid === 'CreateOrChangeStackRolesOnlyWithBoundary');
+  assert.deepEqual([create.Action].flat().sort(), roleActions);
+  // Exact ARN with StringEquals (iam:PermissionsBoundary is a single-valued string key), scoped to this account.
+  assert.deepEqual(create.Condition, {StringEquals: {'iam:PermissionsBoundary': boundaryArn}});
+  const guard = exec.Statement.find(s => s.Sid === 'DenyRoleChangesWithoutTheBoundary');
+  assert.equal(guard.Effect, 'Deny'); assert.deepEqual([guard.Action].flat().sort(), roleActions); assert.equal(guard.Resource, '*');
+  assert.deepEqual(guard.Condition, {StringNotEquals: {'iam:PermissionsBoundary': boundaryArn}}, 'a missing or different boundary is an explicit deny');
+  assert.ok(!allows(exec).filter(s => s !== create).some(s => roleActions.some(action => covers(new Set([s.Action].flat()), action))), 'no unconditioned role creation');
   assert.deepEqual(exec.Statement.find(s => s.Sid === 'PassStackRolesToLambdaAndScheduler').Condition, {StringEquals: {'iam:PassedToService': ['lambda.amazonaws.com', 'scheduler.amazonaws.com']}});
-  const deny = exec.Statement.find(s => s.Effect === 'Deny');
-  for (const action of ['lambda:CreateFunctionUrlConfig', 'lambda:AddPermission', 's3:DeleteBucketPublicAccessBlock', 'iam:DeleteRolePermissionsBoundary', 'ec2:*']) assert.ok(deny.Action.includes(action), action);
+  const denied = new Set(exec.Statement.filter(s => s.Effect === 'Deny').flatMap(s => [s.Action].flat()));
+  for (const action of ['lambda:CreateFunctionUrlConfig', 'lambda:AddPermission', 's3:DeleteBucketPublicAccessBlock', 'iam:DeleteRolePermissionsBoundary', 'ec2:*',
+    'iam:CreatePolicyVersion', 'iam:SetDefaultPolicyVersion', 'iam:AttachRolePolicy', 'iam:CreateUser', 'iam:CreateAccessKey']) assert.ok(denied.has(action), action);
 });
 
 test('boundary: applied to every stack role when configured, absent otherwise, and covers every runtime action', () => {
@@ -88,7 +100,7 @@ test('boundary: applied to every stack role when configured, absent otherwise, a
 
 test('operator policy: deploys only through the CDK bootstrap roles and never edits IAM', () => {
   const granted = actionsOf(operator);
-  assert.ok(allows(operator).find(s => s.Sid === 'CdkDeployThroughBootstrapRoles').Resource.every(arn => /role\/cdk-hnb659fds-(deploy|file-publishing|lookup)-role-/.test(arn)));
+  assert.ok(allows(operator).find(s => s.Sid === 'CdkDeployThroughBootstrapRoles').Resource.every(arn => /role\/cdk-hnb659fds-(deploy|file-publishing)-role-978446946447-us-east-1$/.test(arn)));
   for (const action of ['iam:CreateRole', 'iam:PutRolePolicy', 'iam:PassRole', 'cloudformation:CreateStack', 'cloudformation:UpdateStack', 'lambda:UpdateFunctionCode', 'scheduler:UpdateSchedule'])
     assert.ok(!covers(granted, action), `operator cannot ${action} directly`);
 });

@@ -36,8 +36,11 @@ test('bucket: no public access, encrypted, TLS-only, versioned with bounded old 
 });
 
 test('table: on-demand, encrypted, point-in-time recovery, retained; prod adds deletion protection', () => {
-  template.hasResourceProperties('AWS::DynamoDB::Table', {BillingMode: 'PAY_PER_REQUEST', SSESpecification: {SSEEnabled: true},
+  template.hasResourceProperties('AWS::DynamoDB::Table', {BillingMode: 'PAY_PER_REQUEST',
     PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}, KeySchema: [{AttributeName: 'pk', KeyType: 'HASH'}, {AttributeName: 'sk', KeyType: 'RANGE'}]});
+  // AWS-owned key encryption (always on): no SSE-KMS key, so no KMS permission path or KMS charge.
+  const [table] = resourcesOf('AWS::DynamoDB::Table');
+  assert.ok(!table.Properties.SSESpecification?.SSEEnabled && !table.Properties.SSESpecification?.KMSMasterKeyId, 'no KMS-backed table encryption');
   template.hasResource('AWS::DynamoDB::Table', {DeletionPolicy: 'Retain'});
   const prod = synth({environment: 'prod', confirmProduction: true, account: '123456789012', region: 'us-east-1'}).template;
   prod.hasResourceProperties('AWS::DynamoDB::Table', {DeletionProtectionEnabled: true});

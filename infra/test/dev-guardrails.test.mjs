@@ -29,10 +29,13 @@ const P = {
 const glob = pattern => new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`, 'i');
 const matches = (patterns, value) => [patterns].flat().some(p => glob(p).test(value));
 function deniedBy(request) {
-  const {action, region = 'us-east-1', principal} = request;
+  // resource defaults to a stack-owned ARN; resource-scoped statements (e.g. the bootstrap-role
+  // protection) apply only when the request targets a matching resource.
+  const {action, region = 'us-east-1', principal, resource = `arn:aws:iam::${ACCT}:role/CareerCentralMonitor-dev-Resource`} = request;
   for (const scp of SCPS) for (const s of scp.Statement) {
     if (s.Effect !== 'Deny') continue;
     if (s.Action ? !matches(s.Action, action) : matches(s.NotAction, action)) continue;
+    if (s.Resource && s.Resource !== '*' && !matches(s.Resource, resource)) continue;
     const c = s.Condition ?? {};
     if (c.StringNotEquals?.['aws:RequestedRegion'] && c.StringNotEquals['aws:RequestedRegion'].includes(region)) continue;
     if (c.ArnNotLike?.['aws:PrincipalArn'] && matches(c.ArnNotLike['aws:PrincipalArn'], principal)) continue;

@@ -36,7 +36,8 @@ export class MonitorStack extends Stack {
     });
     const table = new dynamodb.Table(this, 'MonitorTable', {
       partitionKey: {name: 'pk', type: dynamodb.AttributeType.STRING}, sortKey: {name: 'sk', type: dynamodb.AttributeType.STRING},
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      // Encrypted at rest with the AWS-owned key: no KMS key, KMS permissions or KMS request charges.
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, encryption: dynamodb.TableEncryption.DEFAULT,
       pointInTimeRecoverySpecification: {pointInTimeRecoveryEnabled: true}, deletionProtection: prod, removalPolicy: RemovalPolicy.RETAIN,
       // On-demand ceiling: a runaway caller is throttled instead of billed without limit.
       // A tick makes a few dozen small requests, so this leaves wide headroom.

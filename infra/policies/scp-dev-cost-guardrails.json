@@ -5,32 +5,96 @@
       "Sid": "DenyCostlyFeaturesOfAllowedServices",
       "Effect": "Deny",
       "Action": [
-        "lambda:PutProvisionedConcurrencyConfig", "lambda:CreateFunctionUrlConfig", "lambda:UpdateFunctionUrlConfig", "lambda:AddPermission",
-        "dynamodb:CreateGlobalTable", "dynamodb:UpdateGlobalTable", "dynamodb:CreateTableReplica", "dynamodb:PurchaseReservedCapacityOfferings",
-        "dynamodb:EnableKinesisStreamingDestination", "dynamodb:UpdateContributorInsights",
-        "s3:PutReplicationConfiguration", "s3:PutAccelerateConfiguration", "s3:PutInventoryConfiguration", "s3:PutAnalyticsConfiguration",
-        "s3:PutStorageLensConfiguration", "s3:CreateMultiRegionAccessPoint",
-        "kms:CreateKey", "kms:ReplicateKey",
-        "logs:PutDataProtectionPolicy", "logs:PutAccountPolicy", "logs:CreateLogAnomalyDetector", "logs:StartLiveTail",
-        "cloudwatch:PutMetricStream", "cloudwatch:PutAnomalyDetector", "cloudwatch:PutInsightRule",
-        "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
-        "ecr:PutReplicationConfiguration", "ecr:PutRegistryScanningConfiguration", "ecr:CreatePullThroughCacheRule",
-        "cloudformation:ActivateType", "cloudformation:RegisterType", "cloudformation:PublishType",
-        "servicequotas:RequestServiceQuotaIncrease", "servicequotas:PutServiceQuotaIncreaseRequestIntoTemplate",
-        "organizations:LeaveOrganization", "account:EnableRegion",
-        "iam:CreateUser", "iam:CreateAccessKey", "iam:CreateLoginProfile"
+        "lambda:PutProvisionedConcurrencyConfig",
+        "lambda:CreateFunctionUrlConfig",
+        "lambda:UpdateFunctionUrlConfig",
+        "lambda:AddPermission",
+        "dynamodb:CreateGlobalTable",
+        "dynamodb:UpdateGlobalTable",
+        "dynamodb:CreateTableReplica",
+        "dynamodb:PurchaseReservedCapacityOfferings",
+        "dynamodb:EnableKinesisStreamingDestination",
+        "dynamodb:UpdateContributorInsights",
+        "s3:PutReplicationConfiguration",
+        "s3:PutAccelerateConfiguration",
+        "s3:PutInventoryConfiguration",
+        "s3:PutAnalyticsConfiguration",
+        "s3:PutStorageLensConfiguration",
+        "s3:CreateMultiRegionAccessPoint",
+        "kms:CreateKey",
+        "kms:ReplicateKey",
+        "logs:PutDataProtectionPolicy",
+        "logs:PutAccountPolicy",
+        "logs:CreateLogAnomalyDetector",
+        "logs:StartLiveTail",
+        "cloudwatch:PutMetricStream",
+        "cloudwatch:PutAnomalyDetector",
+        "cloudwatch:PutInsightRule",
+        "ecr:PutImage",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutReplicationConfiguration",
+        "ecr:PutRegistryScanningConfiguration",
+        "ecr:CreatePullThroughCacheRule",
+        "cloudformation:ActivateType",
+        "cloudformation:RegisterType",
+        "cloudformation:PublishType",
+        "servicequotas:RequestServiceQuotaIncrease",
+        "servicequotas:PutServiceQuotaIncreaseRequestIntoTemplate",
+        "organizations:LeaveOrganization",
+        "account:EnableRegion",
+        "iam:CreateUser",
+        "iam:CreateAccessKey",
+        "iam:CreateLoginProfile"
       ],
       "Resource": "*"
     },
     {
       "Sid": "ProtectGuardrailsFromEveryoneButTheAdminSessions",
       "Effect": "Deny",
-      "Action": ["budgets:ModifyBudget", "s3:PutAccountPublicAccessBlock"],
+      "Action": [
+        "budgets:ModifyBudget",
+        "s3:PutAccountPublicAccessBlock",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:CreatePolicyVersion",
+        "iam:SetDefaultPolicyVersion",
+        "iam:DeletePolicyVersion",
+        "iam:DeletePolicy"
+      ],
       "Resource": "*",
-      "Condition": {"ArnNotLike": {"aws:PrincipalArn": [
-        "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_CareerCentralDevBootstrap_*",
-        "arn:aws:iam::*:role/OrganizationAccountAccessRole"
-      ]}}
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_CareerCentralDevBootstrap_*",
+            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::*:role/OrganizationAccountAccessRole"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ProtectBootstrapRolesFromEveryoneButTheAdminSessions",
+      "Effect": "Deny",
+      "Action": [
+        "iam:PutRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRole"
+      ],
+      "Resource": "arn:aws:iam::*:role/cdk-hnb659fds-*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_CareerCentralDevBootstrap_*",
+            "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_AdministratorAccess_*",
+            "arn:aws:iam::*:role/OrganizationAccountAccessRole"
+          ]
+        }
+      }
     }
   ]
 }
