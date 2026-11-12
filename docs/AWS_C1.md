@@ -558,24 +558,49 @@ The budget and SCPs remain as account guardrails; removing them is a separate de
   | DynamoDB PITR | 6 | `ENABLED` |
   | First manual invocation (quiet baseline) | 9 | HTTP 200; `ok: true`, `polled: 1`, `failed: 0`. The source then `healthy`, checkpoint provenance `synthetic`, 0 alerts |
   | Second manual invocation (repeat, nothing due) | — | HTTP 200; `ok: true`, `polled: 0`, `failed: 0`. The source stayed `healthy`, 0 alerts |
+  | New synthetic posting (fixture step 2) | 10 | Exactly **one** alert |
+  | Re-poll of the unchanged fixture | 11 | `alertCount` stayed **1** (no duplicate) |
+  | Two closely spaced invocations | 12 (partial) | Both completed; the first `polled: 1`, the second skipped the source as `not_due`. This shows sequential re-entry is safe; **a simultaneous claim race was not exercised** (see Pending) |
+  | IAM policy simulator | 13 | All **five** expected decisions matched (user-reported count; the individual actions were not recorded here) |
+  | Authorization revoke | 14 | `revoke` returned `revoked: true`. The next invocation returned `MONITOR_RECURRING_NOT_AUTHORIZED`, with the source and `alertCount` unchanged |
+  | Log privacy scan | 15 | 0 matches for `example.invalid`, 0 for `Fictional Alpha` |
+  | CloudWatch alarms | 16 | All six alarms `OK` |
 
-- **Pending:** not run, or not reported. The deployment is a successful create with a verified configuration and quiet baseline, **not an accepted test**.
-  - Step 6, remaining read-backs: no function URL, no Lambda resource policy, table `OnDemandThroughput` 10/10, the permissions boundary on both roles, the budget email subscriber.
-  - Step 6a: the guardrail budget recipient is **Active**.
-  - Step 7: invocation before seeding returns `MONITOR_LAMBDA_OBJECT_MISSING`, not `AccessDenied` (the 404-on-missing-key check of the `ListBucket` grant). Seeding has already happened, so this needs a temporarily missing object or a fresh stack.
-  - Step 8: `probe` of real S3 and DynamoDB conditional semantics.
-  - **Alerting:**
-    - Step 10: one new fixture posting → exactly one alert.
-    - Step 11: repeated check → no duplicate.
-  - **Concurrency and failure/recovery:**
-    - Step 12: concurrent invocations.
-    - CC-017 dev acceptance: an injected mid-poll timeout → `worker_lost` and reclaim; a stale writer gets a 412 with nothing corrupted; Retry-After and backoff honoured; the restore drill (S3 version + PITR).
-  - **Permissions:** step 13, IAM simulator checks of the runtime role (and of the execution role in CloudShell step 5).
-  - **Revocation:** step 14, revoke → the tick polls nothing.
-  - **Logs and alarms:** step 15, the log scan for posting text; step 16, no alarm in `ALARM`.
-  - **Cost:** step 17, next-day bill under $0.50, then one week of measured cost against the forecast.
-  - The live-v2 policy comparison above.
-- **Still not enabled, each a separate approval:** the EventBridge schedule, live employer reads, real sources, alarm notifications, GitHub OIDC, prod.
+- **Pending:** not run, or not reported. The deployment has a verified configuration, quiet baseline, single-alert/no-duplicate behaviour, revocation and log privacy, **but the full C1 acceptance suite has not passed**.
+  - **Billing verification:**
+    - Step 17: the next-day bill (Billing → Bills) is under $0.50.
+    - CC-017 acceptance: one week of measured cost is within the budget forecast.
+    - The budget's actual and forecast figures match the bill.
+  - **Guardrail verification** (not recorded in this repository):
+    - G1 / step 6a: the guardrail budget recipient is **Active**.
+    - G2: account-level S3 Block Public Access is all on.
+    - G3–G5: the three SCPs are attached to the dev account only (`list-policies-for-target`, plus the EC2-denied and other-Region-denied checks in CloudShell step 2).
+    - G6: the Lambda concurrency quota, and whether `reservedConcurrency` 1 applies.
+    - The live `CareerCentralDevCfnExec` v2 equals the repository file (comparison command above).
+  - **Configuration read-backs still open (step 6):** no function URL, no Lambda resource policy, table `OnDemandThroughput` 10/10, the permissions boundary on both roles, the budget email subscriber.
+  - **Storage semantics:**
+    - Step 7: a missing object reads as `MONITOR_LAMBDA_OBJECT_MISSING`, not `AccessDenied` (the `ListBucket` grant). Seeding has happened, so this needs a temporarily missing object or a fresh stack.
+    - Step 8: `probe` of real S3 `If-Match`/`If-None-Match` and DynamoDB conditional writes.
+  - **Concurrency, failure and recovery** (CC-017 dev acceptance):
+    - A truly simultaneous claim race. Two invocations must overlap in the same instant, so that one is refused by the tick or source lease rather than by `not_due`.
+    - An injected mid-poll timeout → `worker_lost`, then reclaim.
+    - A stale writer gets a 412 and nothing is corrupted.
+    - Retry-After and backoff are honoured.
+    - Authorization **expiry** stops polls. Revocation passed; expiry is a separate path.
+    - Disabling the schedule stops all activity. The schedule has been disabled throughout, so the enable → disable transition is untested.
+    - The restore drill: one partition from an S3 version plus the control item from PITR.
+  - **Execution-role simulator set:** confirm whether CloudShell step 5's execution-role checks were among the five decisions above. If not, they remain to run.
+- **Tooling gap for further cloud tests.** After the revoke, the dev table holds no authorization. `seed-dev-fixture.mjs seed` cannot restore it, because it configures the source first and fails with `MONITOR_SOURCE_EXISTS` for the existing `alpha`. The options are a fresh stack, or an `authorize` subcommand, which is a code change needing its own review. No re-authorization has been performed.
+- **Operational approvals still required (each separate; none given):**
+  - How to continue cloud testing after the revoke: a fresh stack, or a reviewed `authorize` subcommand.
+  - An alarm notification channel (alarms have no actions today).
+  - Enabling the EventBridge schedule.
+  - Enabling live employer reads.
+  - Handing 1–3 real sources to the cloud with `owner=cloud` (local revoked), then one week of observation.
+  - Merging C1 into the live local checkout.
+  - Keeping or tearing down the dev stack, including the retained bucket and table.
+  - GitHub OIDC.
+  - Any prod deployment.
 
 ## Later stages (each a separate approval)
 

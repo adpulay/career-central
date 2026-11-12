@@ -9,15 +9,22 @@
   - **Invocations:**
     - The first manual invocation returned HTTP 200 (`ok: true`, `polled: 1`, `failed: 0`). The source was then `healthy` with `synthetic` provenance and 0 alerts (a quiet baseline).
     - The second returned HTTP 200 (`ok: true`, `polled: 0`, `failed: 0`), and the source stayed healthy with 0 alerts.
+  - **Later checks (2026-11-12):**
+    - A new synthetic posting produced exactly one alert, and re-polling the unchanged fixture kept `alertCount` at 1.
+    - Two closely spaced invocations completed: the first polled 1, the second skipped as `not_due`. A simultaneous claim race is not proven.
+    - The IAM simulator gave 5/5 expected decisions.
+    - Revoke returned `revoked: true`, then `MONITOR_RECURRING_NOT_AUTHORIZED`, with the source and alert count unchanged.
+    - The log scan found 0 matches for both sentinels, and all six alarms were `OK`.
 - **The full C1 acceptance suite has not passed.** Still pending:
-  - the remaining configuration read-backs and the Active budget recipient;
-  - the pre-seed 404 check and the S3/DynamoDB conditional-semantics probe;
-  - alerting (one alert for a new posting, no duplicate);
-  - concurrency;
-  - failure/recovery (timeout → `worker_lost`, stale-writer 412, backoff, restore drill);
-  - IAM simulator checks, revocation, log scan, alarms and measured cost.
+  - **Billing:** the next-day bill and one week of measured cost.
+  - **Guardrail verification:** the Active budget recipient, account Block Public Access, SCP attachment, the Lambda quota, and live policy v2 equalling the repo.
+  - The remaining configuration read-backs.
+  - The missing-object 404 check and the conditional-semantics probe.
+  - A simultaneous claim race.
+  - **Failure/recovery:** timeout → `worker_lost`, stale-writer 412, backoff, authorization expiry, the schedule-disable transition, the restore drill.
+- **Further cloud tests are blocked on re-authorization.** The seed script cannot re-authorize the existing source; this needs a fresh stack or a reviewed `authorize` subcommand.
 
-  See [AWS_C1 → Deployment record](../AWS_C1.md#deployment-record).
+  See [AWS_C1 → Deployment record](../AWS_C1.md#deployment-record) and [CC-017 → Dev acceptance record](tasks/CC-017.md#dev-acceptance-record--account-978446946447--us-east-1-results-verified-by-the-user-on-2026-11-12).
 
 ## CC-017 C1 security review for account 978446946447; CloudShell procedure ready — 2026-11-12 (late)
 
