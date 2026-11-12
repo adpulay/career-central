@@ -1,5 +1,38 @@
 # Verified project state
 
+## CC-017 C1 synth-only implementation validated; pilot healthy — 2026-11-12 (afternoon)
+
+**C1 (branch `career-central/cc-017-c1`, worktree; not merged; nothing provisioned, no AWS account used).** The CDK stack, least-privilege IAM, alarms and budget are implemented and validated by synth and tests; see [CC-017](tasks/CC-017.md).
+- `cdk synth` with no AWS credentials succeeds. The cdk-nag validation report has no plugin findings: 0 unresolved, 5 acknowledged individually.
+- **Lambda asset:** exactly `index.mjs` (3,544,560 bytes) and `tracker-aliases.json` (697 bytes). The documented limit is 8 MiB; Lambda's own limit is 250 MB unzipped.
+- **Privacy and credential scan** of the asset, template and asset manifest: no profile values, CV lines, email addresses, application roles, local paths, AWS keys, OAuth/API tokens, private keys or JWTs. There were two benign hits, both checked by context: the CDK asset's content-hash `.zip` key, and a tracker path string in the bundled path-resolver code (code, not data).
+- **Defects found and fixed in this review:**
+  - Real S3 returns 403 (not 404) for a missing key when the role lacks `s3:ListBucket`, so the first poll of a source with no partition yet would have failed as an ambiguous error. The role now has `s3:ListBucket` on the bucket ARN only.
+  - `dynamodb:DeleteItem` is now confined to the tick-lease partition (`dynamodb:LeadingKeys = MONITOR`).
+  - The `TicksMissing` window now spans three ticks, so schedules over 30 minutes cannot false-alarm.
+- **Tests:** 20/20 infra tests passed. The related root and web unit tests: 2,570 of 2,574 passed (258 files). The 2 failures (`route-loading-coverage`, `status-tone-contrast` on `career-central` web UI) fail identically on the untouched base checkout `48dc32bb`, and the branch changes nothing under `web/`. Lint (2,096 files), typecheck and the production build passed.
+- **Browser suites were not run in this session:** Google Chrome (`channel: "chrome"`) is not installed in this WSL environment. That is an environment limit, not a test failure.
+- **Not done (needs approval):** GitHub OIDC roles, any deploy, alarm notification channel.
+
+**Pilot health at 14:57 UTC.**
+- 14 logged ticks since activation, all exit 0, `submittedApplications` 0 every run.
+- The Windows task is `Ready` with last result 0, and its action is now the headless `conhost.exe --headless wsl.exe …` form.
+- No gap is unexplained: ticks stopped 06:21–14:38 UTC, overnight local time while the PC slept.
+- Cloudflare, Databricks, Stripe and Scale AI are healthy. Palantir is `failing` after one `timeout` at 14:38 (backoff, next due 15:38), and it had recovered from earlier timeouts.
+- Since activation, no file changed in `cv.md`, `config/profile.yml`, `modes/_profile.md`, `data/applications.md`, `data/application-automation/`, `data/offers/`, `data/pipeline.md`, `data/backups/` or `output/`; only `data/job-monitor/` (6 files) and the tick log changed. This is a modification-time check: no stored fingerprint file exists to compare byte for byte.
+
+## Local pilot running; CC-017 C1 local implementation (partial) — 2026-11-12
+
+**Pilot (activated 2026-11-11 23:39 UTC with user approval; authorization expires 2026-11-18 23:39:09 UTC).**
+- The Windows task `\CareerCentral\MonitorTick` runs every 10 minutes. The first 11 ticks (to 06:01 UTC) all exited 0; protected application, email, profile, policy, CV and tracker data are byte-identical to the pre-activation fingerprints. There are 2 alerts (both unique; a Cloudflare update and a new Cloudflare posting) and no duplicates.
+- **Observed failures, all recovered by backoff:** a Palantir timeout at 00:21, and a Stripe failure at 00:48. At 05:40 three sources failed at once, 12 s after Windows left Modern Standby; those are classified as the generic `provider_unavailable` (network not yet up).
+- **Ticks paused while the PC slept** (00:48–04:23, 04:50–05:40) and resumed automatically.
+- **Unresolved:** the 06:11 run ended with `0xC000013A` (console closed / Ctrl+C) mid-poll, leaving Palantir's lease to expire (the designed recovery). The interactive task shows a `wsl.exe` console window each run. A hidden-console action is proposed in HANDOFF, pending approval.
+
+**C1 local implementation:** SDK wrappers, transfer bundles and single-writer ownership, the Lambda entry and a verified bundle are implemented on branch `career-central/cc-017-c1` (worktree, not yet merged); see [CC-017](tasks/CC-017.md). IAM, the CDK stack, alarms and the budget are not started. Nothing is provisioned and no AWS account has been used.
+
+Validation in the C1 worktree: 464 root tests and 9 infra tests passed, plus lint, typecheck, production build and the three browser suites.
+
 ## Five-employer baselines complete; CC-017 C0 integrated — 2026-11-11
 
 - **Stripe:** its single scheduled retry ran at 23:27:42 UTC and succeeded: 785 postings, all `baseline`, first-seen equal to the live checkpoint (ETag recorded), 0 alerts and 0 proposals.

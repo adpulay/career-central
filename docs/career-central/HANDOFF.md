@@ -1,5 +1,21 @@
 # Latest handoff
 
+## C1 synth-only stack validated; ready for dev-account approvals — 2026-11-12 (afternoon)
+
+- **C1 branch** `career-central/cc-017-c1` now holds the CDK stack, IAM, alarms and budget, validated by synth, cdk-nag and 20 infra tests; the Lambda asset privacy scan is clean. Three IAM/alarm defects were fixed in this review (see [STATUS](STATUS.md)). The branch is still unmerged and needs review before a fast-forward.
+- **Supersedes the entry below:**
+  - The Windows task already runs with the headless `conhost.exe` action (observed, last result 0).
+  - The network-error classification is implemented on the C1 branch (`19b5eed2`, `dns_failure` / `network_unavailable` / …). The live checkout gets it only after the merge.
+- **Browser suites** need Google Chrome installed in WSL (`npx playwright install chrome`, a system change); they were not run this session.
+- **Next:** the approvals in [CLOUD_DEPLOYMENT_PLAN §15](CLOUD_DEPLOYMENT_PLAN.md#15-decisions-requiring-your-approval-before-any-deployment), then the dev-account integration test in [AWS_C1](../AWS_C1.md). It must also confirm real 404-on-missing-key behavior with the new `s3:ListBucket` grant.
+
+## Pilot running; C1 on its branch; one pilot fix pending approval — 2026-11-12
+
+- **C1 work** lives on `career-central/cc-017-c1` (worktree `../career-ops-c1`), kept apart because the live task executes the main checkout every 10 minutes. Merge by fast-forward once reviewed; it changes `loadMatchingContext` to async and adds source ownership, both covered by tests.
+- **Pilot fix awaiting approval:** re-register the task action to run without a console window, so a closed window cannot kill a tick mid-poll. Proposed: `conhost.exe --headless wsl.exe -d Ubuntu -u root -- <repo>/scripts/job-monitor-tick.sh`, with every other setting unchanged.
+- **Diagnostic improvement (not done):** classify network errors such as DNS failure, connection refused or `fetch failed` as `network_unavailable` instead of `provider_unavailable`.
+- **Next C1 work:** IAM least-privilege policies and the CDK stack (DynamoDB, S3, Lambda, Scheduler disabled by default, log retention), alarms and the budget, all synth/test-only. Then a dev-account integration test after the account, region, budget and OIDC approvals.
+
 ## Pilot ready for authorization; C0 integrated; C1 next — 2026-11-11
 
 - **Main:** `career-central/pre-m3d-stabilization` at `3b45c549` includes C0 (storage port, eligibility projection, telemetry, handler) and the C1 preparation (cloud-shaped store with authoritative `load()`, distributed leases, concurrency tests). See [STATUS](STATUS.md) and [CC-017](tasks/CC-017.md).
