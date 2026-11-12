@@ -8,7 +8,8 @@ import {fileURLToPath} from 'node:url';
 import {contextConfig} from '../lib/config.mjs';
 import {MonitorStack} from '../lib/monitor-stack.mjs';
 
-const app = new App();
+// No AWS::CDK::Metadata resource: library-version reporting is not needed.
+const app = new App({analyticsReporting: false});
 const config = contextConfig(app.node.tryGetContext('careerCentral'));
 const bundleDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/monitor-tick');
 new MonitorStack(app, `CareerCentralMonitor-${config.environment}`, {config, bundleDir,

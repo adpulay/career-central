@@ -55,13 +55,17 @@ export class MonitorStack extends Stack {
     const fn = new lambda.Function(this, 'MonitorTick', {
       runtime: lambda.Runtime.NODEJS_24_X, architecture: lambda.Architecture.ARM_64, handler: 'index.handler',
       code: lambda.Code.fromAsset(bundleDir), memorySize: 512, timeout: Duration.seconds(300), role, logGroup,
+      // The Scheduler invokes asynchronously, so Lambda's own async retries (default 2) would
+      // re-run a failed tick even with the schedule's retries at 0. The next tick is the retry.
+      retryAttempts: 0, maxEventAge: Duration.minutes(5),
       ...(config.reservedConcurrency ? {reservedConcurrentExecutions: config.reservedConcurrency} : {}),
       environment: {MONITOR_BUCKET: bucket.bucketName, MONITOR_TABLE: table.tableName, MONITOR_ENVIRONMENT: env,
         MONITOR_LIVE_READS: config.liveReads ? 'enabled' : 'disabled', ...(config.fixtureSources.length ? {MONITOR_FIXTURE_SOURCES: config.fixtureSources.join(',')} : {})},
       description: `Career Central monitor tick (${env})`,
     });
 
-    const schedulerRole = new iam.Role(this, 'SchedulerRole', {assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com')});
+    // Confused-deputy guard: only schedules in this account may assume the role.
+    const schedulerRole = new iam.Role(this, 'SchedulerRole', {assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com', {conditions: {StringEquals: {'aws:SourceAccount': this.account}}})});
     schedulerRole.addToPolicy(new iam.PolicyStatement({sid: 'InvokeTick', actions: ['lambda:InvokeFunction'], resources: [fn.functionArn]}));
     new scheduler.CfnSchedule(this, 'MonitorTickSchedule', {
       scheduleExpression: `rate(${config.scheduleMinutes} minutes)`, state: config.scheduleEnabled ? 'ENABLED' : 'DISABLED',

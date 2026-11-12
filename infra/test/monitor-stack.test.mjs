@@ -82,13 +82,17 @@ test('schedule: DISABLED by default; enabling is explicit; scheduler role can on
   template.hasResourceProperties('AWS::Scheduler::Schedule', {State: 'DISABLED', ScheduleExpression: 'rate(10 minutes)', FlexibleTimeWindow: {Mode: 'OFF'},
     Target: Match.objectLike({RetryPolicy: {MaximumRetryAttempts: 0, MaximumEventAgeInSeconds: 300}})});
   synth({scheduleEnabled: true}).template.hasResourceProperties('AWS::Scheduler::Schedule', {State: 'ENABLED'});
+  // Async invocation: Lambda's own retries must be off too, or a failed tick runs up to 3 times.
+  template.hasResourceProperties('AWS::Lambda::EventInvokeConfig', {MaximumRetryAttempts: 0, MaximumEventAgeInSeconds: 300, Qualifier: '$LATEST'});
+  const trust = Object.entries(template.findResources('AWS::IAM::Role')).find(([id]) => id.startsWith('SchedulerRole'))[1].Properties.AssumeRolePolicyDocument.Statement;
+  assert.deepEqual(trust.map(s => [s.Principal.Service, Object.keys(s.Condition?.StringEquals ?? {})]), [['scheduler.amazonaws.com', ['aws:SourceAccount']]], 'scheduler trust limited to this account');
 });
 
 test('no VPC, NAT, EC2, RDS, SQS, ECS or other unexpected services', () => {
   const types = new Set(Object.values(template.toJSON().Resources).map(resource => resource.Type));
   for (const type of types) assert.ok(!/^AWS::(EC2|RDS|SQS|ECS|ElastiCache|OpenSearchService|Elasticsearch)::/.test(type), `unexpected ${type}`);
   assert.deepEqual([...types].sort(), ['AWS::Budgets::Budget', 'AWS::CloudWatch::Alarm', 'AWS::DynamoDB::Table', 'AWS::IAM::Policy', 'AWS::IAM::Role',
-    'AWS::Lambda::Function', 'AWS::Logs::LogGroup', 'AWS::S3::Bucket', 'AWS::S3::BucketPolicy', 'AWS::Scheduler::Schedule']);
+    'AWS::Lambda::EventInvokeConfig', 'AWS::Lambda::Function', 'AWS::Logs::LogGroup', 'AWS::S3::Bucket', 'AWS::S3::BucketPolicy', 'AWS::Scheduler::Schedule']);
 });
 
 test('alarms stay within the free allowance; activation-only alarms appear when the schedule is enabled', () => {
