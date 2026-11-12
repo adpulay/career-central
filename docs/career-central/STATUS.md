@@ -1,5 +1,16 @@
 # Verified project state
 
+## CC-017 C1 dev-account cost guardrails proposed — 2026-11-12 (late)
+
+- **Proposed, not applied** ([AWS_C1 → Cost guardrails](../AWS_C1.md#cost-guardrails-before-any-deployment-each-step-needs-approval)):
+  - A $5 account budget with a verified recipient, created before any deployment.
+  - Account-level S3 Block Public Access.
+  - Three SCPs on the dev account only: region, service allowlist, costly features and tampering.
+  - The Lambda concurrency quota check.
+- **Stack:** DynamoDB on-demand throughput is capped at 10/10 RRU/WRU per second, and the dev stack defers to the account budget. It has 17 resources; cdk-nag reports 0 unresolved findings.
+- **Tests:** infra 34/34. The offline SCP evaluation shows every planned action allowed and 48 costly actions denied.
+- **No AWS change was made.** The pilot is untouched.
+
 ## CC-017 C1 first-deployment procedure finalized with narrow permissions — 2026-11-12 (late)
 
 - **Procedure:** fixture-only, `us-east-1`, $5 budget, manual invocations; see [AWS_C1](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval). It now uses a scoped CloudFormation execution policy and a role permissions boundary in place of CDK's default `AdministratorAccess` execution role, plus a scoped operator policy (`infra/policies/`, tested offline).

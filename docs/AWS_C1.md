@@ -76,6 +76,98 @@ and reads no user-layer file.
 - **One region** that offers `nodejs24.x` on arm64 and EventBridge Scheduler. `us-east-1` matches the cost estimates in CLOUD_DEPLOYMENT_PLAN §11.
 - **Short-lived credentials only**: an IAM Identity Center (SSO) profile, e.g. `aws sso login --profile cc-dev`. No access keys on disk or in the repository. No GitHub OIDC role for this test.
 
+### Cost guardrails (before any deployment; each step needs approval)
+
+These limit what can be created and where. They make an accidental large bill unlikely, but they are **not a spending cap** (see Residual risks). Files are in `infra/policies/` and are tested offline by `infra/test/dev-guardrails.test.mjs`.
+- The evaluator checks every action the plan uses against the SCPs: bootstrap, deploy, runtime, operator checks and budget verification. All are allowed.
+- 48 costly actions are denied for every principal, as are other regions and guardrail tampering.
+- A mutation adding `ec2:*` to the allowlist was caught.
+
+| # | Guardrail | Where | Who |
+|---|---|---|---|
+| G1 | $5 account budget `career-central-dev-guardrail`, verified recipient (**Active**) | Dev account | Dev-account root (first sign-in) |
+| G2 | Account-level S3 Block Public Access (all four) | Dev account | Dev-account root |
+| G3 | SCP `CareerCentralDevRegion`: deny every non-global action outside `us-east-1` | Organizations, attached to the dev **account only** | Management account |
+| G4 | SCP `CareerCentralDevServiceAllowlist`: deny every service the test doesn't use (EC2, RDS, SageMaker, Bedrock, OpenSearch, ElastiCache, Redshift, EKS, ECS, Lightsail, API Gateway, CloudFront, ELB, Glue, Athena, Kinesis, SNS, SQS, Marketplace, Savings Plans, support plans, domains, Session Manager, …) | Same | Management account |
+| G5 | SCP `CareerCentralDevCostGuardrails`: deny costly features of allowed services, and guardrail tampering | Same | Management account |
+| G6 | Read the Lambda concurrency quota; set `reservedConcurrency` 1 when possible | Dev account | Admin session (read-only) |
+
+G5 denies:
+- **Costly features:** Lambda provisioned concurrency, Function URLs and resource permissions; DynamoDB global tables, replicas, reserved capacity, Kinesis streaming and Contributor Insights; S3 replication, acceleration, inventory, analytics, Storage Lens and multi-Region access points; KMS customer keys; Logs data protection, anomaly detectors and Live Tail; CloudWatch metric streams, anomaly detectors and Contributor Insights rules; ECR image pushes, replication and enhanced scanning; third-party CloudFormation types.
+- **Escapes:** quota increase requests, leaving the organization, enabling opt-in Regions, and IAM users and access keys.
+- **Tampering, by anyone except the admin sessions** (Identity Center `CareerCentralDevBootstrap`, `OrganizationAccountAccessRole`): changing or deleting budgets, and changing account Block Public Access.
+
+**G1 + G2 — dev-account root, one console session** (also step A4 of Account setup):
+1. Sign in at https://console.aws.amazon.com as the dev account's root, using the *Forgot password* flow on its email if no password exists yet. Turn on root MFA (account menu → Security credentials).
+2. Account menu → **Account** → *IAM user and role access to Billing information* → Edit → **Activate**.
+3. **Billing and Cost Management → Budgets → Create budget** → *Customize (advanced)* → *Cost budget*:
+   - Name `career-central-dev-guardrail`; period *Monthly*; *Recurring*; *Fixed* $5.00; scope *All AWS services*.
+   - Alert thresholds: 50 % Actual, 80 % Actual, 100 % Actual and 100 % Forecasted, each to the same email address. Create.
+4. Open the verification email within 12 hours **while still signed in to this account**, confirm, and check that the budget's recipient status reads **Active**.
+5. **S3 → Block Public Access settings for this account** → Edit → tick all four → Save.
+
+CLI equivalent for G1 (after the CLI is set up, admin profile; replace the placeholder in a scratch copy, never in the repo):
+
+```bash
+cp infra/policies/dev-account-budget-notifications.template.json /tmp/budget-notifications.json   # edit <budget-email> there
+aws budgets create-budget --account-id "$ACCOUNT" --budget file://infra/policies/dev-account-budget.json \
+  --notifications-with-subscribers file:///tmp/budget-notifications.json --profile cc-dev-bootstrap
+aws s3control put-public-access-block --account-id "$ACCOUNT" --profile cc-dev-bootstrap \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+```
+
+**G3–G5 — management account** (modifies the management account's Organizations configuration; separate approval). Console:
+1. **AWS Organizations → Policies → Service control policies → Enable service control policies.** This changes nothing on its own; `FullAWSAccess` stays attached everywhere.
+2. *Create policy* three times, pasting `scp-dev-region.json`, `scp-dev-service-allowlist.json` and `scp-dev-cost-guardrails.json` as `CareerCentralDevRegion`, `CareerCentralDevServiceAllowlist` and `CareerCentralDevCostGuardrails` (each is well under the 5,120-character limit).
+3. For each policy: **Targets → Attach** → select **only** the `career-central-dev` account. Do not attach to *Root* or an OU: that would also restrict any other member accounts. The management account is never restricted by SCPs.
+
+CLI equivalent (a management-account admin profile, which you'd create separately):
+
+```bash
+ROOT=$(aws organizations list-roots --query 'Roots[0].Id' --output text)
+aws organizations enable-policy-type --root-id "$ROOT" --policy-type SERVICE_CONTROL_POLICY
+for p in region:CareerCentralDevRegion service-allowlist:CareerCentralDevServiceAllowlist cost-guardrails:CareerCentralDevCostGuardrails; do
+  ID=$(aws organizations create-policy --type SERVICE_CONTROL_POLICY --name "${p#*:}" --description "Career Central dev cost guardrail" \
+       --content "$(node -e 'process.stdout.write(JSON.stringify(require(process.argv[1])))' "$PWD/infra/policies/scp-dev-${p%%:*}.json")" --query Policy.PolicySummary.Id --output text)
+  aws organizations attach-policy --policy-id "$ID" --target-id "$ACCOUNT"
+done
+aws organizations list-policies-for-target --target-id "$ACCOUNT" --filter SERVICE_CONTROL_POLICY --query 'Policies[].Name'
+```
+
+Check: the list shows `FullAWSAccess` plus the three. In the dev account, `aws ec2 describe-instances --profile cc-dev-bootstrap` fails with an explicit deny from a service control policy, and `aws sts get-caller-identity` still works.
+
+**G6 — Lambda concurrency (read-only):** `aws service-quotas get-service-quota --service-code lambda --quota-code L-B99A9384 --profile cc-dev-bootstrap --query Quota.Value`.
+- At **1,000 or more**, deploy with `"reservedConcurrency":1`: at most one tick at a time, which caps Lambda compute at about $17 for a month of non-stop use.
+- At **10** (common for new accounts), Lambda requires the unreserved pool to stay intact, so nothing can be reserved. Rely on the controls under Residual risks. The SCP stops anyone in the account requesting a higher quota.
+
+**Why the deployment permissions cannot bypass these.**
+- SCPs bind **every** principal in the dev account: its root user, `OrganizationAccountAccessRole`, both Identity Center roles, the CDK bootstrap and CloudFormation execution roles, and the stack's roles. Only service-linked roles are exempt.
+- Nothing in the dev account can detach an SCP; only the management account can. Leaving the organization is denied.
+- The CloudFormation execution policy cannot touch budgets or create users or keys, and the stack's roles are capped by their boundary.
+- The admin exception in G5 covers only budgets and account Block Public Access, not the service or region denials.
+
+**Stack cost ceilings and drivers** (synthesized 2026-11-12, dev context: 17 resources):
+
+| Resource | Bills for | Ceiling or bound |
+|---|---|---|
+| Lambda (512 MB, 300 s, arm64, no VPC, no tracing) | Requests, GB-seconds | Only IAM principals can invoke: no URL, no resource permission, schedule DISABLED, async retries 0. A hard cap only with `reservedConcurrency` 1 (G6). |
+| DynamoDB on demand + PITR | Request units, storage, PITR storage | **Throughput capped at 10 RRU and 10 WRU per second**: under about $20 for a full month at the cap. PITR on kilobytes. |
+| S3 (versioned, 30-day old versions) | Requests, storage | Bounded by Lambda; no replication or acceleration (G5) |
+| CloudWatch Logs (14 days) | Ingestion, storage | Bounded by Lambda; allowlisted short log lines |
+| Custom metrics (EMF) | Metric-months | Fixed 10 names × 1 dimension, so at most 10 metrics (about $3 a month beyond the free tier) |
+| 6 alarms | Alarm-months | $0.60 a month beyond the free tier |
+| Scheduler | Invocations | DISABLED |
+| Roles, policies, bucket policy, event-invoke config | Nothing | — |
+
+**Residual risks, and why this is not an absolute cap.**
+- **AWS has no hard spending limit.** Budgets only alert, and billing data lags hours (up to about a day), so spend can pass $5 before the email arrives.
+- **SCPs limit categories, not volume.** Inside the allowed services, anyone with admin rights in the account can still create costly things by hand, for example a DynamoDB table with large *provisioned* capacity (no IAM condition key limits capacity), large S3 uploads, or Lambda invoked in a loop.
+- **Without reserved concurrency, Lambda compute has no ceiling** beyond the account quota.
+- **Stored data keeps costing** until deleted. The bucket and table are retained by design, so teardown is required.
+- **Outside this account's guardrails:** the management account (never restricted by SCPs), other member accounts, support-plan or Marketplace purchases made from the management account, and taxes.
+- **Optional stronger steps** (not proposed now): an AWS Budgets *action* in the management account that attaches a deny-all SCP to the dev account at 100 % actual. It is still subject to the billing-data lag. Also Cost Anomaly Detection, which is free.
+- **Lambda and DynamoDB service quotas** bound the worst case, but at default quotas, not at $5.
+
 ### Account setup (done by the user; nothing here deploys)
 
 Local state checked 2026-11-12: no AWS CLI in WSL, no `~/.aws` configuration in WSL or Windows, no `AWS_*` environment variables, no cached SSO sessions. The CDK CLI 2.1146.1 is installed in `infra/` (pinned).
@@ -144,7 +236,7 @@ CDK's default bootstrap gives CloudFormation `AdministratorAccess`. This proposa
 
 | Policy | Attached to | What it allows |
 |---|---|---|
-| `dev-cfn-execution-policy.json` → managed policy `CareerCentralDevCfnExec` | The bootstrap CloudFormation execution role (`--cloudformation-execution-policies`) | Create, update and delete exactly the 11 resource types in the stack. It creates roles **only if** they carry the boundary below, and passes roles only to Lambda and Scheduler. It cannot delete the bucket or table (they are retained). It explicitly **denies** Function URLs, Lambda resource permissions, bucket ACLs, removing public-access blocks or boundaries, managed-policy attachment, IAM users or keys, and EC2, API Gateway, ELB and CloudFront. |
+| `dev-cfn-execution-policy.json` → managed policy `CareerCentralDevCfnExec` | The bootstrap CloudFormation execution role (`--cloudformation-execution-policies`) | Create, update and delete exactly the 10 resource types in the dev stack (no budgets: the account budget belongs to the admin session). It creates roles **only if** they carry the boundary below, and passes roles only to Lambda and Scheduler. It cannot delete the bucket or table (they are retained). It explicitly **denies** Function URLs, Lambda resource permissions, bucket ACLs, removing public-access blocks or boundaries, managed-policy attachment, IAM users or keys, and EC2, API Gateway, ELB and CloudFront. |
 | `dev-role-boundary.json` → managed policy `CareerCentralDevRoleBoundary` | Permissions boundary of both stack roles (`permissionsBoundaryName`) | Exactly the runtime actions the function and scheduler use, and nothing else (a test pins equality). An over-broad inline policy could therefore never take effect. |
 | `dev-operator-policy.json` | Inline policy of the Identity Center permission set `CareerCentralDevOperator` | Deploy only by assuming the CDK deploy, file-publishing and lookup roles. Then: invoke, inspect, the emergency stop, seed and probe objects and items, the IAM simulator on the stack roles, viewing budgets, and teardown of the retained bucket and table. It **cannot** edit IAM, CloudFormation, function code or the schedule directly. |
 
@@ -158,7 +250,7 @@ CDK's default bootstrap gives CloudFormation `AdministratorAccess`. This proposa
 |---|---|
 | `CDKToolkit` (bootstrap, once per account and region) | Staging S3 bucket (retained when the stack is deleted), an empty ECR repository, five IAM roles (deploy, file publishing, image publishing, lookup, and CloudFormation execution with `CareerCentralDevCfnExec` instead of the default `AdministratorAccess`), SSM parameter `/cdk-bootstrap/hnb659fds/version`. Default bucket encryption; no customer-managed KMS key (`--bootstrap-customer-key` is not used) |
 | Created by hand before bootstrap | Managed policies `CareerCentralDevCfnExec` and `CareerCentralDevRoleBoundary` |
-| `CareerCentralMonitor-dev` (18 resources) | 1 S3 bucket + bucket policy; 1 DynamoDB table; 1 log group; 2 IAM roles + 2 inline policies; 1 Lambda function + its event-invoke config (async retries 0); 1 schedule (**DISABLED**); 6 alarms (no actions); 1 budget |
+| `CareerCentralMonitor-dev` (17 resources) | 1 S3 bucket + bucket policy; 1 DynamoDB table; 1 log group; 2 IAM roles + 2 inline policies; 1 Lambda function + its event-invoke config (async retries 0); 1 schedule (**DISABLED**); 6 alarms (no actions). DynamoDB on-demand ceiling 10 read and 10 write request units per second. No budget (`stackBudget: false`) |
 
 The synthesized template has no VPC, NAT, EC2, RDS, SQS, ECS, KMS key or `AWS::CDK::Metadata` resource. It also has no publicly reachable endpoint:
 - No Lambda Function URL, resource-based permission, API Gateway, load balancer or CloudFront.
@@ -169,14 +261,14 @@ With no VPC there is no NAT gateway or interface endpoint charge. The fixture te
 
 ### Budget
 
-`budgetLimitUsd` 5 and `budgetEmail` set to the approved address. It emails at 50, 80 and 100 % of actual cost and 100 % of forecast cost.
+**The dev account's budget is created by hand, before anything is deployed** (guardrail G1 below). It is not created by the stack, which is why `stackBudget: false` is set. It then also covers bootstrap costs, survives `cdk destroy`, and is never re-created by a redeploy, so it needs verifying only once. It is `career-central-dev-guardrail`: $5 monthly cost budget, email at 50, 80 and 100 % of actual and 100 % of forecast (`infra/policies/dev-account-budget*.json`). Only the admin session can change or delete it (SCP `scp-dev-cost-guardrails.json`). The stack's own budget (`stackBudget` default `true`) remains available for accounts without one.
 - **Email verification is required** (AWS Budgets, for recipients added from 2026-09-30; [AWS announcement](https://aws.amazon.com/about-aws/whats-new/2026/10/aws-budgets/), [user guide](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-email-recipients.html)).
-  - When `cdk deploy` creates the budget, AWS sends a verification email to `budgetEmail`. **Only verified addresses receive budget alerts.**
-  - The recipient must open the link while signed in to **this dev account** (the operator's Identity Center console session works).
-  - The link expires after **12 hours**. If it expires, choose **Resend verification** on the budget's detail page (Billing and Cost Management → Budgets → `career-central-dev`).
-  - The detail page shows the recipient as **Pending**, **Active** or **Inactive**. Acceptance requires **Active** (step 6a); Pending or Inactive fails the test.
-  - Re-creating the budget (for example after a teardown and redeploy) adds the recipient again, so plan to verify again.
-  - Use an address you read promptly; it is stored in the Budget resource and the CloudFormation template.
+  - When the budget is created, AWS sends a verification email. **Only verified addresses receive budget alerts.**
+  - The recipient must open the link while signed in to **this dev account** (its root session at G1, or an Identity Center session).
+  - The link expires after **12 hours**. If it expires, choose **Resend verification** on the budget's detail page (Billing and Cost Management → Budgets → `career-central-dev-guardrail`).
+  - The detail page shows the recipient as **Pending**, **Active** or **Inactive**. Acceptance requires **Active** (G1, rechecked at step 6a); Pending or Inactive blocks bootstrap and deployment.
+  - Re-creating the budget adds the recipient again, so plan to verify again.
+  - Use an address you read promptly.
   - Allow mail from AWS so the verification and alert emails aren't filtered as spam.
   - No test alert can be triggered. Verification status is the strongest delivery evidence available before real spend.
 - **Billing access.** In a member account, the root user may need to enable *IAM user and role access to Billing information* (Account settings) before an Identity Center role can create or view budgets. Preflight step P4 checks this.
@@ -208,10 +300,11 @@ P2 must report no `ERROR` or `SECURITY_WARNING` findings. If it does, stop and a
 
 ```bash
 export AWS_PROFILE=cc-dev AWS_REGION=us-east-1
-CTX='careerCentral={"budgetEmail":"<approved-address>","budgetLimitUsd":5,"fixtureSources":["alpha"],"permissionsBoundaryName":"CareerCentralDevRoleBoundary"}'
+CTX='careerCentral={"stackBudget":false,"accountBudgetName":"career-central-dev-guardrail","fixtureSources":["alpha"],"permissionsBoundaryName":"CareerCentralDevRoleBoundary"}'
+# Add ,"reservedConcurrency":1 inside the braces if G5 found a Lambda concurrency quota of 1,000 or more (it hard-caps compute).
 [ "$(aws sts get-caller-identity --query Account --output text)" = "$ACCOUNT" ] || echo "WRONG ACCOUNT - stop"   # 1
 npx cdk synth --quiet --context "$CTX"                     # 3. clean cdk-nag report
-npx cdk diff --context "$CTX"                              # 4. review: only the 18 resources above, both roles with the boundary
+npx cdk diff --context "$CTX"                              # 4. review: only the 17 resources above, both roles with the boundary
 npx cdk deploy CareerCentralMonitor-dev --context "$CTX" --require-approval broadening   # 5. confirm the IAM summary
 OUT=$(aws cloudformation describe-stacks --stack-name CareerCentralMonitor-dev --query 'Stacks[0].Outputs' --output json)
 B=$(echo "$OUT" | node -pe 'JSON.parse(require("fs").readFileSync(0)).find(o=>o.OutputKey==="BucketName").OutputValue')
@@ -223,8 +316,8 @@ invoke() { aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-ba
 
 | # | Action | Success criterion |
 |---|---|---|
-| 6 | Read back the configuration: `aws scheduler get-schedule` (name from `describe-stack-resources`), `aws lambda get-function-configuration --function-name "$FN" --query Environment.Variables`, `aws lambda get-function-event-invoke-config --function-name "$FN"`, `aws s3api get-public-access-block --bucket "$B"`, `aws dynamodb describe-continuous-backups --table-name "$T"`, `aws budgets describe-subscribers-for-notification --account-id "$ACCOUNT" --budget-name career-central-dev --notification NotificationType=ACTUAL,ComparisonOperator=GREATER_THAN,Threshold=50,ThresholdType=PERCENTAGE` | Schedule `DISABLED`; `MONITOR_LIVE_READS=disabled`, `MONITOR_FIXTURE_SOURCES=alpha`; `MaximumRetryAttempts` 0; all four public-access blocks true; PITR `ENABLED`; one `EMAIL` subscriber with the approved address |
-| 6a | Within 12 hours of the deploy, open the AWS Budgets verification email for `budgetEmail` while signed in to the dev account and confirm. Then open Billing and Cost Management → Budgets → `career-central-dev` and read the recipient status (use **Resend verification** if the link expired). If the operator session cannot complete verification (an access error on the budget page), complete it in a short `CareerCentralDevBootstrap` session and record that. | The recipient status is **Active** (verified). **Pending** or **Inactive** fails the test: alerts would reach nobody. Stop here until it is Active. |
+| 6 | Read back the configuration: `aws scheduler get-schedule` (name from `describe-stack-resources`), `aws lambda get-function-configuration --function-name "$FN" --query Environment.Variables`, `aws lambda get-function-event-invoke-config --function-name "$FN"`, `aws s3api get-public-access-block --bucket "$B"`, `aws dynamodb describe-continuous-backups --table-name "$T"`, `aws budgets describe-subscribers-for-notification --account-id "$ACCOUNT" --budget-name career-central-dev-guardrail --notification NotificationType=ACTUAL,ComparisonOperator=GREATER_THAN,Threshold=50,ThresholdType=PERCENTAGE` | Schedule `DISABLED`; `MONITOR_LIVE_READS=disabled`, `MONITOR_FIXTURE_SOURCES=alpha`; `MaximumRetryAttempts` 0; all four public-access blocks true; PITR `ENABLED`; table `OnDemandThroughput` 10/10 (`aws dynamodb describe-table`); one `EMAIL` subscriber with the approved address |
+| 6a | Billing and Cost Management → Budgets → `career-central-dev-guardrail`: read the recipient status. It was verified at G1; if it is not Active, use **Resend verification** and complete it while signed in to the dev account. If the operator session cannot open the page, use a short `CareerCentralDevBootstrap` session and record that. | The recipient status is **Active** (verified). **Pending** or **Inactive** fails the test: alerts would reach nobody. Stop here until it is Active. |
 | 7 | `invoke out0.json` **before seeding** | Function error with message `MONITOR_LAMBDA_OBJECT_MISSING`, **not** `AccessDenied`. This proves a missing key reads as 404 under the function role (the `ListBucket` grant). |
 | 8 | `$SEED probe $TARGET` | `passed: true`. Every check holds on the real services: S3 missing key → null, `If-None-Match: *` and stale `If-Match` → 412, current ETag accepted; DynamoDB create-only and stale version → conditional failure, consistent read sees the latest, stale delete refused, probe item removed. |
 | 9 | `$SEED seed $TARGET --hours 2`, then `invoke out1.json`, then `$SEED status $TARGET` | `ok: true`, `polled: 1`; `alertCount` 0 (quiet baseline); `provenance: synthetic` |
