@@ -118,7 +118,7 @@ test('a missing root throws rather than reporting an empty, passing scan', () =>
 });
 
 test('SKIP_DIRS excludes generated and user content, so the count is checkout-independent', () => {
-  for (const name of ['.git', 'node_modules', 'output', 'data', 'coverage', 'test-results']) {
+  for (const name of ['.git', 'node_modules', 'output', 'data', 'coverage', 'test-results', 'dist', 'cdk.out']) {
     assert.ok(SKIP_DIRS.has(name), `${name} must stay excluded`);
   }
 });
