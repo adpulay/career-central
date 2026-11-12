@@ -8,6 +8,7 @@
   },
   "scripts": {
     "doctor": "node doctor.mjs",
+    "gmail": "node scripts/gmail-email.mjs first-sync",
     "ui": "node scripts/ui-server.mjs",
     "or": "node openrouter-runner.mjs",
     "or:scan": "node openrouter-runner.mjs scan",
@@ -81,7 +82,10 @@
     "build:dashboard": "node build-dashboard.mjs",
     "serve:dashboard": "cd dashboard && go run .",
     "postinstall": "node -e \"process.exit(['','0','false'].includes((process.env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD||'').toLowerCase())?1:0)\" || npx playwright install chromium || npx playwright install chromium || node -e \"console.warn('\\ncareer-ops: could not install Playwright Chromium. Everything else is installed; PDF generation and browser checks need it. Run: npx playwright install chromium')\"",
-    "manifesto": "node manifesto.mjs"
+    "manifesto": "node manifesto.mjs",
+    "gmail:send": "node scripts/gmail-send.mjs",
+    "gmail:reply": "node scripts/gmail-reply.mjs",
+    "monitor": "node scripts/job-monitor.mjs"
   },
   "keywords": [
     "ai",
@@ -112,6 +116,8 @@
     "@azure/msal-node-extensions": "1.5.27",
     "@google/generative-ai": "^0.24.1",
     "dotenv": "^18.0.4",
+    "email-addresses": "5.0.0",
+    "google-auth-library": "11.3.4",
     "js-yaml": "^5.3.0",
     "playwright": "1.64.1",
     "undici": "^7.30.1"

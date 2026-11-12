@@ -27,3 +27,43 @@ Current execution environment: Node 24.20.0 in WSL2/Linux (`Ubuntu`), with `wsl.
 Native Windows validation remains required on the intended Windows account: run a clean Node session with the persistence mode selected, validate a save/load/delete round trip through the current-user DPAPI-backed extension, restart Node and verify same-user recovery, verify a different Windows user cannot decrypt, interrupt a write, and confirm no plaintext token/cursor file appears. On WSL/Linux, configure a real Secret Service for the same Linux user, verify service presence and native binding, run the equivalent round-trip/restart/interruption tests, then repeat with the service stopped to prove fail-closed behavior. Do not use Windows DPAPI from WSL via PowerShell as a fallback; that would create an unreviewed cross-identity credential boundary.
 
 M3C automated tests use in-memory fictional secret providers and real local M3B operational writers. They establish contracts and redaction, not OS-vault encryption or native filesystem behavior.
+
+## Local readiness diagnostic
+
+Run `node scripts/outlook-readiness.mjs` from the repository. It emits bounded,
+redacted JSON and exits 2 while prerequisites or real vault validation remain
+incomplete. It loads the native extension and lists acquired Linux user bus names
+with a three-second subprocess timeout; it does not construct persistence or open
+configuration/cache files. A present service and loadable extension are only
+prerequisites. The command deliberately cannot certify a save/restart/load,
+interruption or cross-user isolation test, and never authorizes live sign-in.
+
+## Interrupted bounded sync recovery
+
+`node scripts/outlook-sync-recovery.mjs status` reads only bounded owner metadata
+and reports a redacted recovery candidate. It does not open credentials, message
+content or configuration, and does not independently verify worker liveness.
+After stopping the original worker, explicit `abandon --run-id ID
+--expected-revision N --acknowledge-worker-stopped` records failed/incomplete
+through the existing mailbox writer, preserving the successful checkpoint.
+It never replays mail inspection or observation persistence. A fresh sync is a
+separate invocation. See [CC-007](../../docs/career-central/tasks/CC-007.md).
+
+## First-live preparation (CC-008)
+
+The session-only path now signs in and inspects within the same `first-sync`
+process; no persistent-vault prerequisite is needed for that path. See the
+[runbook](../../docs/OUTLOOK.md) for one-hour/10-message acceptance and optional
+native Windows setup. The protected factory precreates its cache owner-only,
+refuses unsafe existing aliases/permissions and vendor scratch files, and
+serializes cooperating validation in one directory. Native Windows uses explicit
+DACL checks for owner and current-user/SYSTEM-only allow rules, rather than
+POSIX mode assumptions. These checks do not defeat malicious same-user races or
+administrators with takeover privileges, and their native acceptance is unrun.
+
+`outlook-vault-test.mjs` uses isolated synthetic labels and a separate subdirectory
+for save/restart/verify/delete. It does not open real OAuth config or caches.
+A round-trip does not certify power-loss/interrupted-write durability or cross-user
+isolation. Linux still requires real Secret Service and native bindings; there
+is no plaintext or WSL-to-Windows DPAPI fallback. MSAL account removal now uses
+`removeAccount` with persistence callbacks; it does not revoke remote consent.

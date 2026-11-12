@@ -1,5 +1,376 @@
 # Verified project state
 
+## CC-017 C1 security review for account 978446946447; CloudShell procedure ready — 2026-11-12 (late)
+
+- **IAM repairs.**
+  - The boundary condition is now `StringEquals` on the exact account-scoped ARN, with a conditioned `PutRolePermissionsBoundary` and an explicit deny for a missing or different boundary.
+  - Self-escalation denies are in place, all ARNs are pinned to the account, and S3 access is pinned with `aws:ResourceAccount`.
+  - Rollback and delete reads were added. The operator no longer has the lookup role.
+- **SCPs.** CloudShell is allowed, the admin exception covers `AdministratorAccess`, and boundaries, policy versions and bootstrap roles are protected. The table now uses AWS-owned encryption (no KMS path).
+- **CloudShell path** (WSL SSO is not working): an offline, checksummed package with the reviewed assembly pinned to `aws://978446946447/us-east-1`, plus ordered commands in [AWS_C1](../AWS_C1.md#running-from-aws-cloudshell-the-current-path-wsl-sso-is-not-working).
+- **Tests:** infra 44/44; lint passes. **Nothing was executed in AWS.**
+
+## CC-017 C1 dev-account cost guardrails proposed — 2026-11-12 (late)
+
+- **Proposed, not applied** ([AWS_C1 → Cost guardrails](../AWS_C1.md#cost-guardrails-before-any-deployment-each-step-needs-approval)):
+  - A $5 account budget with a verified recipient, created before any deployment.
+  - Account-level S3 Block Public Access.
+  - Three SCPs on the dev account only: region, service allowlist, costly features and tampering.
+  - The Lambda concurrency quota check.
+- **Stack:** DynamoDB on-demand throughput is capped at 10/10 RRU/WRU per second, and the dev stack defers to the account budget. It has 17 resources; cdk-nag reports 0 unresolved findings.
+- **Tests:** infra 34/34. The offline SCP evaluation shows every planned action allowed and 48 costly actions denied.
+- **No AWS change was made.** The pilot is untouched.
+
+## CC-017 C1 first-deployment procedure finalized with narrow permissions — 2026-11-12 (late)
+
+- **Procedure:** fixture-only, `us-east-1`, $5 budget, manual invocations; see [AWS_C1](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval). It now uses a scoped CloudFormation execution policy and a role permissions boundary in place of CDK's default `AdministratorAccess` execution role, plus a scoped operator policy (`infra/policies/`, tested offline).
+- **Verified:**
+  - The template has no public endpoint (no Function URL, Lambda permission, API Gateway, load balancer or CloudFront) and no networking resources.
+  - ~~Budget email needs no confirmation click.~~ Corrected 2026-11-12: AWS Budgets requires email verification for recipients added from 2026-09-30. A verified (**Active**) recipient is now acceptance step 6a in [AWS_C1](../AWS_C1.md).
+  - Teardown covers the versioned bucket, the retained table, the bootstrap and the two managed policies.
+- **Tests:** infra 30/30. Nothing provisioned; the pilot is untouched.
+
+## CC-017 C1 predeployment review complete; fixture-only dev test proposed — 2026-11-12 (evening)
+
+**C1** (branch `career-central/cc-017-c1`; not merged; nothing provisioned; no AWS account, credentials or GitHub access created). Details and the exception register are in [CC-017](tasks/CC-017.md#c1-predeployment-review-2026-11-12-evening-nothing-provisioned); the proposal is in [AWS_C1](../AWS_C1.md#first-deployment-fixture-only-dev-test-proposal-every-step-needs-approval).
+
+**Regression analysis.** The "2,570 of 2,574" from the afternoon was 2 failures plus 2 skips. All four are identical on the untouched base `48dc32bb`:
+- Failure: the web `career-central` route has no loading state.
+- Failure: amber status-text contrast at 4.20 and 4.35, against a 4.5 target.
+- Skip: an opt-in browser upload test.
+- Skip: a permission test that skips under root.
+
+None was caused by C1, and none was changed. The full root suite found one genuine C1 regression: the repo-wide `.mjs` scan read the generated Lambda bundle. It is fixed by skipping build-output directories (`dist`, `cdk.out`). A C1 test race between two suites rebuilding `infra/dist/` was fixed by running the infra suite serially.
+
+**Security hardening.**
+- The scheduler trust policy is limited to this account.
+- Lambda async retries are 0 (the Scheduler invokes asynchronously).
+- No CDK metadata resource is deployed.
+
+The fixture-config template has 18 resources, and cdk-nag shows 0 unresolved findings and 5 acknowledged. The Lambda asset is exactly `index.mjs` (3,544,560 B) and `tracker-aliases.json` (697 B). The privacy and credential scan found nothing sensitive; the same two benign hits were checked by context.
+
+**First-deployment tooling.** `infra/scripts/seed-dev-fixture.mjs` seeds, steps, revokes, reads status and probes real conditional semantics, using synthetic data only. It defaults to a dry run and accepts dev targets only.
+
+**Tests (final).**
+- Infra: 25/25, three consecutive runs.
+- Related root and web set: 2,630 tests, 2,626 pass, 2 fail and 2 skip, the same four as the base.
+- Full root suite: 4,789 tests. Every failure either also fails on the base or passes when re-run alone on both trees.
+- Lint (2,097 files), typecheck and production build pass.
+- Browser suites were not run, because Google Chrome is absent from WSL.
+
+**Pilot (read-only check, 15:48 UTC).**
+- 17 ticks, all exit 0, and `submittedApplications` 0 every run. The task is `Ready` and `Enabled` with last result 0. The authorization still expires 2026-11-18 23:39:09 UTC.
+- The 15:44 tick failed all five sources with `provider_unavailable`. Windows logged a Modern Standby exit at 15:44:12, 12 s before that tick, so the network was not up yet; this is the same pattern as 05:40. Backoff applies.
+- Protected files are unchanged since activation (modification-time check).
+- Nothing about the pilot or its task was changed.
+
+## CC-017 C1 synth-only implementation validated; pilot healthy — 2026-11-12 (afternoon)
+
+**C1 (branch `career-central/cc-017-c1`, worktree; not merged; nothing provisioned, no AWS account used).** The CDK stack, least-privilege IAM, alarms and budget are implemented and validated by synth and tests; see [CC-017](tasks/CC-017.md).
+- `cdk synth` with no AWS credentials succeeds. The cdk-nag validation report has no plugin findings: 0 unresolved, 5 acknowledged individually.
+- **Lambda asset:** exactly `index.mjs` (3,544,560 bytes) and `tracker-aliases.json` (697 bytes). The documented limit is 8 MiB; Lambda's own limit is 250 MB unzipped.
+- **Privacy and credential scan** of the asset, template and asset manifest: no profile values, CV lines, email addresses, application roles, local paths, AWS keys, OAuth/API tokens, private keys or JWTs. There were two benign hits, both checked by context: the CDK asset's content-hash `.zip` key, and a tracker path string in the bundled path-resolver code (code, not data).
+- **Defects found and fixed in this review:**
+  - Real S3 returns 403 (not 404) for a missing key when the role lacks `s3:ListBucket`, so the first poll of a source with no partition yet would have failed as an ambiguous error. The role now has `s3:ListBucket` on the bucket ARN only.
+  - `dynamodb:DeleteItem` is now confined to the tick-lease partition (`dynamodb:LeadingKeys = MONITOR`).
+  - The `TicksMissing` window now spans three ticks, so schedules over 30 minutes cannot false-alarm.
+- **Tests:** 20/20 infra tests passed. The related root and web unit tests: 2,570 of 2,574 passed (258 files). The 2 failures (`route-loading-coverage`, `status-tone-contrast` on `career-central` web UI) fail identically on the untouched base checkout `48dc32bb`, and the branch changes nothing under `web/`. Lint (2,096 files), typecheck and the production build passed.
+- **Browser suites were not run in this session:** Google Chrome (`channel: "chrome"`) is not installed in this WSL environment. That is an environment limit, not a test failure.
+- **Not done (needs approval):** GitHub OIDC roles, any deploy, alarm notification channel.
+
+**Pilot health at 14:57 UTC.**
+- 14 logged ticks since activation, all exit 0, `submittedApplications` 0 every run.
+- The Windows task is `Ready` with last result 0, and its action is now the headless `conhost.exe --headless wsl.exe …` form.
+- No gap is unexplained: ticks stopped 06:21–14:38 UTC, overnight local time while the PC slept.
+- Cloudflare, Databricks, Stripe and Scale AI are healthy. Palantir is `failing` after one `timeout` at 14:38 (backoff, next due 15:38), and it had recovered from earlier timeouts.
+- Since activation, no file changed in `cv.md`, `config/profile.yml`, `modes/_profile.md`, `data/applications.md`, `data/application-automation/`, `data/offers/`, `data/pipeline.md`, `data/backups/` or `output/`; only `data/job-monitor/` (6 files) and the tick log changed. This is a modification-time check: no stored fingerprint file exists to compare byte for byte.
+
+## Local pilot running; CC-017 C1 local implementation (partial) — 2026-11-12
+
+**Pilot (activated 2026-11-11 23:39 UTC with user approval; authorization expires 2026-11-18 23:39:09 UTC).**
+- The Windows task `\CareerCentral\MonitorTick` runs every 10 minutes. The first 11 ticks (to 06:01 UTC) all exited 0; protected application, email, profile, policy, CV and tracker data are byte-identical to the pre-activation fingerprints. There are 2 alerts (both unique; a Cloudflare update and a new Cloudflare posting) and no duplicates.
+- **Observed failures, all recovered by backoff:** a Palantir timeout at 00:21, and a Stripe failure at 00:48. At 05:40 three sources failed at once, 12 s after Windows left Modern Standby; those are classified as the generic `provider_unavailable` (network not yet up).
+- **Ticks paused while the PC slept** (00:48–04:23, 04:50–05:40) and resumed automatically.
+- **Unresolved:** the 06:11 run ended with `0xC000013A` (console closed / Ctrl+C) mid-poll, leaving Palantir's lease to expire (the designed recovery). The interactive task shows a `wsl.exe` console window each run. A hidden-console action is proposed in HANDOFF, pending approval.
+
+**C1 local implementation:** SDK wrappers, transfer bundles and single-writer ownership, the Lambda entry and a verified bundle are implemented on branch `career-central/cc-017-c1` (worktree, not yet merged); see [CC-017](tasks/CC-017.md). IAM, the CDK stack, alarms and the budget are not started. Nothing is provisioned and no AWS account has been used.
+
+Validation in the C1 worktree: 464 root tests and 9 infra tests passed, plus lint, typecheck, production build and the three browser suites.
+
+## Five-employer baselines complete; CC-017 C0 integrated — 2026-11-11
+
+- **Stripe:** its single scheduled retry ran at 23:27:42 UTC and succeeded: 785 postings, all `baseline`, first-seen equal to the live checkpoint (ETag recorded), 0 alerts and 0 proposals.
+  - Locations are complete: no work-model-only or empty locations.
+  - The retry used the inline `offices[]` path, which a same-moment live comparison on Cloudflare had proven identical to the `/offices` endpoint (478/478).
+- **All five pilot baselines:** Cloudflare 491, Palantir 304, Scale AI 169, Databricks 912, Stripe 785. Datadog (421) and MongoDB (395) stay configured, outside the pilot.
+- **Partition sizes:** the largest is Databricks at 1.64 MiB compact, 55 % of the per-source budget.
+- **First-seen preserved:** unchanged against the pre-pilot backup for Cloudflare, Datadog and MongoDB, and a single baseline time for each new employer.
+- **Integration:** CC-017 C0 and the C1 preparation were fast-forwarded into `career-central/pre-m3d-stabilization`, from `a5848d68` to `3b45c549` (7 commits, no merge commit, no history rewrite). The temporary worktree was removed after verification; branch `career-central/cc-017-c0` is kept.
+- **Validation in the integrated checkout:**
+  - 460 related Node tests passed (storage contract across file, memory and cloud-shaped stores; cloud concurrency; scheduler including the simulated 7-day run; privacy/redaction; eligibility equivalence), plus lint, typecheck, production build and the job-monitor, job-monitor-cache and career-central browser suites.
+  - Read-only comparison: the pre-integration and integrated code produce an identical paginated dashboard view and health for all 181 reviewable postings.
+  - Unchanged: application jobs/events, the three email records, profile, policy, CV, tracker and `config/profile.yml`.
+- **State:** recurring monitoring is not authorized and no scheduled task is installed. AWS: nothing provisioned, and the cloud adapter has been tested only against fake clients.
+
+## Product vision and documentation alignment — 2026-11-11
+
+This was a documentation-only update; no runtime behavior changed. Added the [ADR 0004](decisions/0004-product-vision-expansion.md) product direction (single-user first, with commercialization out of the near-term roadmap), requirements CC-R19–CC-R24, and authoritative designs in `design/`:
+- [Career Identity](design/CAREER_IDENTITY.md)
+- [Job Sources](design/JOB_SOURCES.md)
+- [Document Intelligence](design/DOCUMENT_INTELLIGENCE.md)
+- [Approvals and Autonomy](design/APPROVALS_AND_AUTONOMY.md)
+- [Networking and Communications](design/NETWORKING_AND_COMMUNICATIONS.md)
+- [Frontend Design System](design/FRONTEND_DESIGN_SYSTEM.md)
+
+It also added the roadmap's 10-step sequence with milestones P1c, P5a and P11, inventory rows F60–F79 (all planned or partial), and the cloud plan's browser execution model (§16, conditional stage C6).
+
+Verified monitoring state when the docs were written:
+- Local per-employer store active since migration commit `37b8c6cd`.
+- Pilot preparation commits `5f9b6077` and `9c32f8b8`.
+- Live baselines: Cloudflare (earlier), Palantir 304, Scale AI 169, and Databricks 912 (a retry succeeded after the response cap was raised).
+- Stripe: still pending, recorded as `enrichment_response_too_large`. The inline-offices fix is committed, and a single retry is scheduled after its backoff.
+- Reviewable postings: 140 across all configured sources, with two potentially eligible (Databricks new-grad). This supersedes the earlier 133 figure.
+- Recurring monitoring not authorized; no Windows task installed.
+- 416 related regressions and three browser suites passed at `9c32f8b8`.
+
+## Local recurring-monitoring pilot configured (not activated) — 2026-11-11
+
+Configured Databricks (Greenhouse), Palantir (Lever), Stripe (Greenhouse) and Scale AI (Greenhouse) at 30 minutes, and moved Cloudflare to 30 minutes. Datadog and MongoDB stay configured, outside the pilot. The configured-source cap was raised from 5 to 8, since storage is per source. A pre-pilot backup is at `data/backups/job-monitor-prepilot-20261111T005246Z/` (SHA256SUMS verified).
+
+**Baselines:**
+- Palantir and Scale AI: established quietly by one bounded `first-poll` each (≤ 2 GETs): 304 and 169 postings, all `baseline`, 0 alerts and 0 proposals.
+- Databricks and Stripe: failed safely, with no checkpoint and backoff. Causes and fixes are in the [runbook](../JOB_MONITOR.md#pilot-databricks-palantir-stripe-scale-ai-cloudflare-configured-2026-11-11-not-activated).
+
+**Eligibility.** The pilot review found two leaks, now fixed with tests: "Team/Tech Lead" titles weren't treated as senior, and Doha/Vilnius and other non-US cities weren't excluded. An offline re-evaluation used the hash-verified baseline text. The shortlist now has 133 reviewable postings (Palantir 73, Cloudflare 18, Scale AI 8, plus the rest); the top 10 are all new-grad roles, with the best score 72 (Palantir Forward Deployed Software Engineer, New Grad – Commercial). None is qualified or high priority: every pilot posting still lacks a verified "never applied" answer for that employer, and most lack an employer start date.
+
+**Deduplication and recovery (rehearsal on a disposable copy of the real data, with replayed real responses).** Fourteen of 14 checks passed:
+- Only the five pilot sources were polled.
+- Identical feeds produced 0 new, 0 updated and 0 alerts; a 304 was recorded as unchanged.
+- An oversized response was recorded as `response_too_large` and backed off for 120 minutes; it was skipped while not due, and the first success afterwards was a quiet baseline.
+- One new reviewable posting produced exactly one alert, and none on repeat.
+- A crashed worker's lease was respected, then reclaimed after it expired.
+- A paused source was never polled, and revoke stopped all polling.
+
+The real data was byte-identical afterwards, and the copy was deleted.
+
+**Health on real data:** scheduler `not_authorized`. Databricks and Stripe are `failing` (`provider_unavailable`, recorded before the new categories). Palantir and Scale AI show `ok_changes` until their next poll, because their baselines were recorded before the baseline flag existed.
+
+**Validation:** 413 related Node regressions passed (72 monitor/scheduler cases). Typecheck/build and the job-monitor, job-monitor-cache and career-central browser suites passed. A read-only real-data dashboard check at 375/1440px showed 100 cards (81 from pilot employers), "Recurring monitoring: not authorized", per-source health, and no writes, external requests, errors or byte changes. The tick wrapper refused without authorization on a copy. No recurring authorization, OS trigger, application, email, push or cloud action.
+
+## Local monitoring-storage migration applied — 2026-11-11
+
+Applied with the user's approval: `npm run monitor -- migrate-store --apply` at 2026-11-11T00:42:24Z, from commit `9e7622c6`.
+
+Pre-flight:
+- Clean tree.
+- The backup `data/backups/job-monitor-premigration-20261111T003329Z/` matched the live ledger SHA-256 (`fa427de7…`), re-verified immediately before applying.
+- No leases, locks, recurring authorization or OS scheduler entries. No process held ledger or monitor files open; leftover PDF-server processes don't reference the ledger.
+
+Result:
+- 3 per-employer partitions: Cloudflare 491, Datadog 421 and MongoDB 395 postings (1,307 total), plus an index recording the legacy content hash.
+- Ledger 3,610,459 → 242,200 bytes (−93.3%).
+- Files are 0600 and directories 0700.
+
+Validation (26/26 checks):
+- Monitor content canonically identical.
+- Every first-seen timestamp and all three live-feed checkpoints identical.
+- No cross-source postings; alerts, proposals and decisions preserved.
+- Ledger keeps only `schemaVersion, jobs, events, gmailMailboxHealth, emailInbox, reviewedMailSends`, each identical (56 jobs, 204 events).
+- Dashboard read model and health identical (27 needs-review; scheduler `not_authorized`; all sources `ok_no_changes`).
+- CV, profile, tracker and discovery cache unchanged.
+- 408 related regressions passed.
+- A read-only production dashboard check on the real data (375/1440px) showed 27 cards, with no writes, no external requests, no errors and no byte changes.
+
+Recovery remains available: a `rollback-store` dry run reports the full state; the backup is intact.
+
+## Migration readiness, scheduler validation, coverage review, cloud plan — 2026-11-11
+
+**Monitoring storage migration: validated, backed up, awaiting approval (not applied).**
+
+- **Backup:** `data/backups/job-monitor-premigration-20261111T003329Z/` (current; it matches the live ledger SHA-256). An earlier 00:22Z backup predates an offline re-evaluation; first-seen timestamps, checkpoints and counts are identical between them. If any monitor command runs before the approved apply, take a fresh backup first. It contains a byte-exact copy of the ledger plus `manifest.json` (SHA-256, counts, checkpoints, first-seen digest). Permissions are 0700/0600 and the location is git-ignored.
+- **Real dry run:** 3 partitions (0.96/0.79/0.73 MB compact), 1,307 postings, 0 alerts/proposals; the ledger stayed byte-identical.
+- **Rehearsal on a disposable copy:** migrate then rollback. Monitor content, first-seen timestamps, checkpoints, the dashboard view and every application/email ledger field were identical in both directions. The copy was deleted.
+- **Operation to approve:** `npm run monitor -- migrate-store --apply`.
+- **Expected file changes:** `data/application-automation/ledger.json` is rewritten without its `jobMonitor` section (≈3.6 MB → ≈0.24 MB; jobs, events and email state unchanged). New files: `data/job-monitor/index.json` and `data/job-monitor/sources/{cloudflare,datadog,mongodb}.json`. A transient `data/job-monitor.lock`.
+- **Rollback:** `npm run monitor -- rollback-store --apply` (new). It folds the split store back into the ledger, verifies, then removes `data/job-monitor/`. Unlike a backup restore, it keeps state recorded after migration. Fallback: restore the backup ledger per its manifest.
+
+**Scheduler validation (offline, simulated clock):** a new 8-hour scenario checks:
+- per-employer intervals (5/15/60 minutes; no source ever polled faster than its interval);
+- respected foreign lease, then exactly one reclaim after expiry (crash recovery);
+- outage backoff limiting retries;
+- a 40-minute Retry-After honored over a 5-minute interval;
+- pause/resume;
+- authorization expiry stopping all polls;
+- quiet baselines across restart;
+- exactly one alert per posting version.
+
+Plus migration/rollback round trips, interruption resume in both directions, and conflict fail-closed checks.
+
+**Employer coverage:** see [EMPLOYER_COVERAGE](EMPLOYER_COVERAGE.md). The 1,242 live postings at the three monitored employers contain no full-time US new-grad engineering role. Projecting the evaluator onto other employers' cached new-grad postings exposed three false exclusions, now fixed with tests: graduation ranges, a benefits-date sentence read as a job start, and clearance "or eligibility to obtain". The monitor also now recognizes "Early Career" and "University Graduate" titles. The real 27-posting shortlist is unchanged (no qualifying postings at the current employers) and protected state is identical.
+
+**Cloud plan:** [CLOUD_DEPLOYMENT_PLAN](CLOUD_DEPLOYMENT_PLAN.md), [ADR 0003](decisions/0003-cloud-monitoring-first.md) (proposed), [CC-017](tasks/CC-017.md). Nothing provisioned.
+
+Validation: 408 related Node regressions passed, zero failures/skips (54 monitor and 12 scheduler/store cases). Typecheck/build and the job-monitor, job-monitor-cache and career-central browser suites passed. No live request, migration of real data, recurring authorization, OS trigger, email, application, push or cloud action.
+
+## Recurring-monitoring readiness and local scheduler — 2026-11-11
+
+Readiness audit findings:
+
+- **Storage cliff.** All monitor state lived in the application ledger under a single 3 MiB budget. Three employers already used 2.37 MB, so a fourth or fifth would fail with `MONITOR_CAPACITY_REVIEW_REQUIRED`. Every poll also rewrote the whole ~2.5 MB ledger holding application history and email state.
+- **No scheduler trigger.** Only per-source `poll-once` existed; there was no tick, no activation record and no operational health classification.
+
+Implemented locally (nothing activated):
+
+- **Split monitor store** (`lib/career-central/monitor-store.mjs`): per-source partitions under `data/job-monitor/`, one atomic file per source, with the index written last. Polls never touch the application ledger. Fresh roots use it; existing in-ledger state stays in legacy mode until an explicit `migrate-store --apply`. Migration verifies a canonical lossless round trip, records the legacy hash, removes only the ledger's `jobMonitor` section, and resumes or fails closed after an interruption.
+- **Scheduler tick** (`lib/career-central/monitor-scheduler.mjs`): one non-overlapping pass over due, authorized, unpaused sources with a per-tick poll budget. It requires `--authorize-live-read` plus a persisted authorization naming exact sources that expires within 30 days and can be revoked. It reuses the existing leases, backoff/Retry-After, adaptive intervals, jitter, conditional reads and per-version alert/proposal deduplication.
+- **Health:** distinct per-source states (no changes, changes, failing, rate limited, overdue, polling, worker lost, paused, never polled, cached only) and scheduler states (not authorized, expired, never ran, running, running with failures, stale). They appear in `health`, `monitorView` and on the dashboard.
+
+Real data: still in legacy mode, deliberately not migrated. A dry run passed (3 partitions of 0.96, 0.79 and 0.73 MB; 1,307 postings) with the ledger byte-identical. Its first attempt failed closed because posting key order differed across interleaved sources; verification now compares canonically, and a regression test reproduces the case. A rehearsal on a disposable copy of the real data migrated successfully: the dashboard view, counts and health were identical, the ledger minus its monitor section was identical, and the ledger shrank from 3.4 MB to 242 KB. The copy was deleted. Health on real data: scheduler `not_authorized`; all three sources `ok_no_changes`.
+
+Validation: 403 related Node regressions passed, zero failures/skips (52 monitor and 10 new store/scheduler cases). Typecheck/build and the job-monitor, job-monitor-cache and career-central browser suites passed, including scheduler/source health labels and checks that no ledger or monitor bytes are written by viewing. No live feed request, OS trigger, recurring authorization, email, application, push or cloud action occurred.
+
+## Role classification and start-date state — 2026-11-11
+
+- **Role classification:** business-function titles (now including business operations, strategy & operations, procurement and supply chain) are excluded only when the title has no engineering function noun (engineer, developer, SRE, DevOps, architect, administrator). "Infrastructure Business Operations Associate" is excluded; cloud, platform, DevOps, backend and SRE engineering titles, and engineering roles in business domains ("Software Engineer, Finance Platform"), still pass. The previous rule would have wrongly excluded that last kind of title.
+- **Start dates:** the employer side and the candidate side are separate. An unstated, month-less or internship employer start is `Employer start date unconfirmed` (`match.startDate`: `employer_unspecified`, `employer_month_unparsed` or `internship_not_compared`). Missing or provisional verified availability is a separate candidate-side unknown, and a stated start before verified availability is still an exclusion.
+- **`potentially_eligible` state:** used only when the employer start date is the sole open item. These postings rank between qualified and needs-review, can be high priority, alert and receive a local preparation proposal, and show "Potentially eligible — start date unconfirmed" on the dashboard. `match.submissionReady` is always false: the monitor never grants submission readiness. `submissionBlockers` lists every open item, and submission gates remain in the application workflow, which doesn't read monitor status.
+
+Real-data offline re-evaluation: the Business Operations posting is now excluded, leaving a 27-posting review list. None are potentially eligible: all 27 also lack an explicit graduation window and an explicit entry-level title, so the state applies only to future clearly new-grad postings. Protected-state fingerprints are unchanged.
+
+Validation: 393 related Node regressions passed with zero failures or skips (52 monitor cases). Typecheck/build and the job-monitor (now including a potentially-eligible label case), job-monitor-cache and career-central browser suites passed. A read-only real-data dashboard check at 375/1440px found 27 cards, the expected labels and no writes, external requests or errors.
+
+## Eligibility classification and evidence fixes — 2026-11-10
+
+Monitor eligibility now:
+
+- Treats a skill as required only when a requirement excerpt names it without a nearby negation.
+- Reads verified citizenship from `authorization.citizenship`, the field the Greenhouse mapper already uses.
+- Excludes executive titles and non-technical business-function titles; employer names containing "cloud" no longer count as a role family.
+- Excludes explicit season/month graduation windows that exclude the verified graduation month.
+- Compares employer start dates at month precision, independent of timezone. Unstated, month-less and internship starts stay unresolved.
+- Labels description evidence. Cached snapshots and stored excerpts cannot count as current eligibility evidence.
+
+A new offline `npm run monitor -- reevaluate` re-applies the evaluator to stored postings. It uses full text only when the text's hash equals the latest observed content hash; see the [runbook](../JOB_MONITOR.md).
+
+Real-data rerun (offline, no network): 1,204 postings re-evaluated and 103 kept unchanged with no verifiable text. The reviewable shortlist went from 31 to 28. The three wrongly admitted postings (an executive go-to-market title, a cloud-finance analyst title and an internship with a later graduation window) are now excluded. A citizenship-requirement posting no longer asks for a verified answer, and a posting stating that Rust experience isn't required no longer flags Rust as mandatory. All 28 still show the employer start as unresolved. One posting is flagged as having only a stored excerpt. Zero qualified; scores remain heuristic. Fingerprints confirmed unchanged: application jobs/events, email inbox/health/sends, monitor sources/checkpoints/alerts/tasks/decisions, tracker, CV, profile/policy, output résumés and the discovery cache.
+
+Validation: 391 relevant Node regressions passed, zero failures/skips (50 monitor cases, 14 new for these issues). Typecheck/build and the job-monitor, job-monitor-cache and career-central production-browser suites passed on fictional data. A read-only production dashboard check on the real data root (GET-only, off-origin blocked) at 375/1440px found 28 cards, each showing incomplete eligibility, none of the three excluded postings, no writes, no external requests and no page errors. No live feed request, email, application, recurring monitor or cloud action occurred.
+
+## Current implementation — shortlist and local monitor, 2026-11-10
+
+[CC-015](tasks/CC-015.md)/[CC-016](tasks/CC-016.md) now deliver a minimum local
+source → match → shortlist → dashboard alert → preparation-proposal workflow.
+See [runbook](../JOB_MONITOR.md) and [owner contract](../../lib/career-central/JOB_MONITOR.md).
+The existing `/career-central` UI persists interested/dismissed/awaiting-application
+monitor decisions, alert dismissal and source pause without touching application
+statuses. The CLI supports local configuration/cache seeding/status/schedule and
+one explicitly authorized due live cycle, not an activated recurring worker.
+
+Reuses existing providers/HTTP, admission/ranking, verified private profile/role
+weights, canonical history parsers and ledger lock/atomic writer. Unknown essential
+eligibility/start/history cannot be presented as ready; scores remain heuristic.
+Checkpoints, content versions, first-seen versus publication evidence, deduplicated
+alerts/proposals, conditional reads, adaptive cadence/backoff, leases and crash
+recovery are implemented locally. Cached private discovery data was seeded without
+live feed requests; application jobs/events and email state remained unchanged.
+
+Cloudflare/Datadog/MongoDB feeds are proposed, locally configured at conservative
+15-minute targets but unapproved for recurring use. Live feed reliability, policy,
+current eligibility and latency are not certified. Five-minute targets are possible
+only when separately appropriate/authorized, never a guaranteed detection rate.
+No recurring monitoring, employer form access/upload/submission, external
+notification/email, verification-code entry, paid service or cloud was activated.
+
+Validation: 339 relevant synthetic regressions passed, zero failures/skips (three unrelated browser-launching cases excluded by name), including 34 monitor cases. Final focused monitor rerun passed 34/34. The existing Career Central and new monitor production-browser suites each passed on fictional data; typecheck/build and 282 local documentation targets passed. Earlier evidence below
+is retained as historical state. Remaining product work includes live bounded
+source acceptance, ongoing worker installation, rich monitoring analytics,
+quiet-hour/snooze delivery and full application/document workflows.
+
+## Current summary — product alignment, 2026-11-10
+
+The [feature inventory](FEATURE_INVENTORY.md) is the detailed capability/status map.
+M0.5–M3C are completed local foundation slices, not a completed career platform.
+Existing discovery/documents/analytics/interview code is substantial but fragmented;
+agent protocols are not general background services or validated product journeys.
+The [roadmap](ROADMAP.md) now prioritizes reliable shortlist → small core priority
+monitor/rapid preparation → one complete approved application → confirmations,
+then ATS breadth, documents, dashboard, communication, interview/learning, gated
+autonomy and mobile/cloud. See [CC-014](tasks/CC-014.md).
+
+Current live evidence: user-operated bounded Gmail list/context succeeded, Gmail
+accepted the reviewed reply, and the user confirmed delivery in the same thread.
+This completes the controlled test round trip only. Generic recruiting-message
+classification, mail-to-status bridge and background sync are still partial.
+The narrow Greenhouse preparation/review transport lacks a confirmed real
+end-to-end application; HTTP 428/uncertain prior attempts require reconciliation.
+No new live action was performed to prepare this summary.
+
+[CC-015](tasks/CC-015.md) and [CC-016](tasks/CC-016.md) are planned, not implemented.
+Continuous adaptive monitoring, deduplicated alert/preparation lifecycle and PWA/
+cloud are not delivered. Autonomous submissions, recurring monitoring, automatic
+codes/replies, new notification sends and provisioning remain unauthorized.
+Existing per-action approval and security controls are unchanged.
+
+Validation for this documentation-only audit is link/reference/consistency and
+diff review; no runtime test/build/scan/mailbox/browser action was run. Historical
+test counts below apply to their original source snapshots and scopes.
+
+## Historical milestone acceptance records
+
+Earlier entries preserve contemporaneous statements (including pending live tests
+and uncommitted working trees); Git and the summary above establish current state.
+
+## Bounded reply context — 2026-11-10
+
+[CC-013](tasks/CC-013.md): user reports test send/delivery succeeded, initially
+in Junk. Readonly reply review now selects one message from a one-hour/ten-message/
+one-page bound and captures conservative thread headers. Separate send approval
+remains required; live incoming reply/threading acceptance is pending. Personal
+writing samples/guide stay in the user layer. No autonomous replies/submissions.
+
+## Reviewed Gmail sending — 2026-11-10
+
+[CC-012](tasks/CC-012.md): separate session OAuth with exact readonly + send,
+interactive content approval, durable duplicate/uncertain-outcome protection and
+private reviewed replies. 294 relevant offline checks pass; no live send or
+delivery verification. Default readonly bounded sync and application gates stay
+unchanged. See [setup](../GMAIL_SENDING.md).
+
+Latest Gmail provider slice (2026-11-10): [CC-011](tasks/CC-011.md) fixes JSON
+parsing of HTTP 204 and retains explicit zero-result list metadata. A subsequent
+user-operated actual Gmail message-list GET passed with HTTP 200, validated
+response, idle/incomplete=false and a corroborated complete local checkpoint.
+278 offline checks pass. This is bounded list acceptance; live forwarded-message
+classification and sender provenance remain unvalidated. No autonomous actions.
+
+Latest Gmail diagnostic slice (2026-11-10): [CC-010](tasks/CC-010.md) adds safe
+stage/category diagnostics, synthetic localhost checking and explicit no-retry
+SDK transport. 261 offline checks pass; current Windows-to-WSL/public HTTPS probes
+passed without OAuth or mailbox requests. Historical post-callback provider cause
+remains unknown until the user's sanitized retry. No private account was accessed.
+
+Latest dedicated Gmail slice (2026-11-10): [CC-009](tasks/CC-009.md) adds a
+consent-gated, session-only Gmail readonly adapter alongside Outlook. 249 offline
+checks pass; no actual account/config/credential/mailbox was accessed. User
+explicitly withheld connection authorization. [Gmail runbook](../GMAIL.md) covers
+no-billing OAuth configuration and the pending controlled first read.
+
+Latest Outlook readiness slice (2026-11-10): [CC-008](tasks/CC-008.md) wires an
+explicit same-process first sign-in/sync with a one-page/10-message/24-hour cap,
+strict delegated read scopes and review-only observations. 223 offline checks
+pass; native vault and live Microsoft acceptance remain unrun. Exact user steps:
+[Outlook runbook](../OUTLOOK.md). Prior checkpoint `a97b6249` verified complete.
+
+Latest reconciliation slice (2026-11-10): [CC-007](tasks/CC-007.md) adds explicit
+interrupted-sync inspection/abandonment using existing owner-store CAS. 98 focused
+tests pass, 0 fail; no live integration. CC-006 is committed as `7ca248e4`.
+
+Latest local continuation (2026-11-10): foundation checkpoint `e7ce36f9` is committed
+and verified on the private remote. New uncommitted readiness and bounded sync
+work is documented in [CC-006](tasks/CC-006.md) and [HANDOFF](HANDOFF.md): 90
+focused tests passed, 0 failed. No live Microsoft integration is enabled. Earlier
+base/dirty-tree statements below describe their original milestone runs.
+
 Updated 2026-11-06. Local detached HEAD base `d3fc7d1`, uncommitted working tree; no milestone commit/release. Runtime tested: Node v24.20.0. Source/tests outrank summaries.
 
 | Area | Implementation | Validation/deployment | Limits |

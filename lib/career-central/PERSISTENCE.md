@@ -1,5 +1,13 @@
 # M3B — Operational persistence and recovery
 
+Monitor storage update (2026-11-11): new data roots keep job-monitor state in its own split store, `data/job-monitor/` ([monitor-store.mjs](monitor-store.mjs)), not the application ledger. Existing in-ledger state remains supported until the explicit verified `migrate-store --apply`. The ledger owner, application records and email state are unchanged by monitor writes on the split store.
+
+Later additive owner extension (2026-11-10): [job monitor v1](JOB_MONITOR.md)
+uses the existing application-ledger lock/atomic writer for `jobMonitor` source
+checkpoints, shortlist dispositions, alerts and local preparation proposals.
+It does not change the v2 worker/mailbox health contracts, application records,
+receipt authority or scheduler behavior. Explicit polling is not recurring activation.
+
 Implemented locally: typed worker/mailbox publishers, owned-store metadata preservation, revision/idempotency checks, atomic replacement/recovery, canonical projection and minimal health-card integration. No publisher loop, OAuth, Graph synchronization, cursor backend, browser workflow or task execution is enabled.
 
 ## Storage and authority
@@ -114,3 +122,15 @@ No backend is implemented and no raw cursor belongs in the ledger, scheduler, da
 See [CC-004](../../docs/career-central/tasks/CC-004.md) and [STATUS](../../docs/career-central/STATUS.md) for exact commands/results. Fixtures exercise real process contention/crashes and ordinary owner writes, not live services. HTTP-only production rendering bypasses `server.mjs` (and its PDF worker), uses disposable data and executes no browser/client JavaScript. It verifies HTML/API health, redaction, cache/origin/method controls and unchanged source bytes.
 
 Remaining limits: Linux validation only; no native Windows/WSL/network-disk certification, authenticated remote producer or cursor backend; no live OAuth/Graph/mailbox/application validation, automatic producer, receipt-artifact verifier or cloud transport. The existing CV Studio build tracing warning remains. Do not publish local build artifacts or treat health metadata as execution authorization.
+
+## Gmail provider extension (CC-009)
+
+`recordMailboxHealth(root, command, {provider: 'gmail'})` uses the same validated
+v2 health contract, owner ledger lock, CAS/replay and recovery semantics in the
+separate `gmailMailboxHealth` field. The default remains Outlook's
+`mailboxHealth`, unchanged. Only `outlook` and `gmail` provider selectors are
+accepted. Account/scope bindings and revision history never cross provider slots.
+No second application tracker or credential store is introduced. Gmail mailbox
+status is not yet added to the canonical dashboard's Outlook mailbox card.
+The Gmail CLI's read-only recovery path selects its provider explicitly. See
+[the Gmail runbook](../../docs/GMAIL.md) for authorization and bounded-read limits.

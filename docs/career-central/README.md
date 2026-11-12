@@ -2,6 +2,10 @@
 
 Career Central extends Career Ops into a personal career workspace. Develop locally; target a hybrid AWS dashboard/data plane with outbound-only Windows/WSL automation workers. No deployment or new external application actions are authorized by the current milestone.
 
+Current continuation: the five-employer monitoring pilot is baselined and awaiting activation approval; CC-017 C0 is integrated and C1 cloud-adapter preparation is tested locally (no AWS resources). The local monitor's real data is migrated to the verified per-employer store, a gated scheduler and health states. Cloud monitoring is planned in [CLOUD_DEPLOYMENT_PLAN](CLOUD_DEPLOYMENT_PLAN.md), [ADR 0003](decisions/0003-cloud-monitoring-first.md) and [CC-017](tasks/CC-017.md); employer recommendations are in [EMPLOYER_COVERAGE](EMPLOYER_COVERAGE.md). See [STATUS](STATUS.md) and [HANDOFF](HANDOFF.md). Nothing is provisioned or activated.
+
+Product vision and subsystem designs: [PRODUCT](PRODUCT.md) → [design/](design/) ([identity](design/CAREER_IDENTITY.md), [sources](design/JOB_SOURCES.md), [documents](design/DOCUMENT_INTELLIGENCE.md), [approvals](design/APPROVALS_AND_AUTONOMY.md), [networking](design/NETWORKING_AND_COMMUNICATIONS.md), [frontend](design/FRONTEND_DESIGN_SYSTEM.md)), plus [ADR 0004](decisions/0004-product-vision-expansion.md).
+
 Read in this order:
 
 1. Repository [AGENTS.md](../../AGENTS.md) and applicable scoped instructions remain authoritative; this entry point does not replace them.

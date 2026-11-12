@@ -1,72 +1,251 @@
-# Read-only Outlook integration
+# Controlled read-only Outlook integration
 
-This implementation supports personal Microsoft accounts (Outlook.com, Hotmail, Live and MSN) using Microsoft Graph and Microsoft's free `@azure/msal-node` OAuth library. Existing Gmail lead ingestion is independent and unchanged. There was no existing Microsoft Graph integration. Application messages are correlated into the existing application ledger through its locked, atomic writer. No paid service was added.
+The personal-account path uses the existing Microsoft MSAL public client,
+consumers authority, authorization code flow with PKCE/state, Graph GET adapter,
+application-mail analyzer, bounded coordinator and locked observation writer.
+MSN, Outlook.com, Hotmail and Live personal accounts are supported by Microsoft.
+No live sign-in or mailbox read has been performed for the current acceptance.
 
-## Connect your account
+## Recommended first use: session-only WSL
 
-Run these commands from the `career-ops` directory, with a browser on the same computer as Node. If Node runs on a remote machine/container, run the connection there with a browser that can reach its loopback callback, or establish a local port forward; do not paste OAuth codes into chat. No password or client secret belongs in Career Ops.
+A protected vault is not required for an interactive session whose tokens remain
+in process memory. `first-sync` signs in and reads within that same process;
+exiting discards the token cache. A standalone session-mode `connect` cannot
+supply credentials to a later CLI invocation. Use the combined command below.
+This uses Microsoft's normal sign-in and consent; it does not bypass either.
 
-1. Open [Microsoft Entra app registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade). Create an app named Career Ops. Select **Personal Microsoft accounts only**, or **Accounts in any organizational directory and personal Microsoft accounts**. The runtime deliberately uses the `consumers` authority. Do not select organizational accounts only. If your account cannot create an app registration, resolve registration access first; a paid service is not required by this implementation.
-2. In Authentication, add the **Mobile and desktop applications** platform with custom redirect URI **`http://localhost/callback`**. This is a public/native application, not a Web app or SPA. The runtime uses a random loopback port; Microsoft ignores the port for registered localhost redirects while matching the path. No implicit grants, client secret, or password flow is needed.
-3. In API permissions, select Microsoft Graph → **Delegated permissions → Mail.Read**. Remove the default User.Read permission if present. Do not add Mail.Send, Mail.ReadWrite, application permissions, or shared-mailbox permissions. MSAL also requests its standard OpenID/profile/offline-access scopes for sign-in and refresh; these do not grant email modification. Mail.Read can read the entire signed-in mailbox, not only employer messages. Application-side filters minimize what is retrieved and retained. Mail.ReadBasic lacks the message bodies needed for verification/confirmation analysis.
-4. Copy the **Application (client) ID**, then run:
+Current preflight: WSL/Linux Node 24.20.0; native Windows Node 22.21.0 is available.
+The WSL native MSAL extension cannot load, no acquired Secret Service is present,
+and `pkg-config --exists libsecret-1` fails. Persistent WSL credentials remain
+unavailable. Native Windows ACL/DPAPI behavior has not been validated here.
+`node scripts/outlook-readiness.mjs` is a capability check, not vault acceptance;
+exit 2 is expected until the relevant prerequisites and real validation exist.
 
-   ```bash
-   node scripts/outlook-email.mjs init --client-id YOUR_CLIENT_ID --account YOUR_EMAIL
-   node scripts/outlook-email.mjs connect
-   ```
+## Register or verify your Microsoft application
 
-5. `connect` defaults to **session-only credentials**. The MSAL cache stays in memory and is discarded when the process exits. This is deliberate where a protected vault is unavailable. Do not select persistent mode until the OS backend is installed and validated. Persistent mode is opt-in:
+1. Open [Microsoft Entra app registrations](https://entra.microsoft.com/).
+   You need access to a tenant and permission to register applications. A personal
+   mailbox alone does not guarantee app-registration access. If registration is
+   blocked, resolve that Microsoft prerequisite or use an existing registration
+   you control; do not borrow a client ID from another app. Microsoft's current
+   [registration guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)
+   lists its Azure account/subscription, tenant and role prerequisites. No Azure
+   resource or subscription is provisioned by Career Ops.
+2. Create **Career Ops**, with sign-in audience **Personal Microsoft accounts
+   only**, or an audience that also includes personal accounts. Organizational
+   accounts only will not work with this integration's `consumers` authority.
+3. Under **Authentication**, add **Mobile and desktop applications**, custom
+   redirect URI **`http://localhost/callback`**. Use a public/native client, not
+   Web or SPA. The code uses a random loopback port. Microsoft's
+   [localhost redirect rules](https://learn.microsoft.com/en-us/entra/identity-platform/reply-url#localhost-exceptions)
+   allow that port variation. Do not enable implicit grants or create a secret.
+4. Under **API permissions**, retain only **Microsoft Graph → Delegated →
+   Mail.Read** as the resource permission. Remove default `User.Read`, if present.
+   Add no `Mail.Send`, `Mail.ReadWrite`, shared-mailbox or application permissions.
+   MSAL adds standard `openid`, `profile`, `offline_access` sign-in/refresh scopes;
+   these are allow-listed, and every unexpected returned resource scope is
+   rejected before Graph access. Rejected accounts/scopes trigger MSAL account
+   removal from this application's cache; provider failures remain redacted.
+5. Copy the **Application (client) ID**. Do not share passwords, tokens, OAuth
+   callback URLs, refresh tokens, or mailbox verification codes with the agent.
 
-   ```bash
-   CAREER_OPS_OUTLOOK_CREDENTIAL_MODE=protected node scripts/outlook-email.mjs connect
-   ```
+[Delegated Mail.Read](https://learn.microsoft.com/en-us/graph/permissions-reference#mailread)
+is available to personal Microsoft accounts and permits reading their mailbox.
+`Mail.ReadBasic` excludes bodies; the existing analyzer needs selected bodies for
+confirmation/rejection/interview classification. Thus `Mail.Read` is the minimum
+mailbox permission for this implementation. Consent covers the mailbox; the
+small window is enforced by our code, not by Microsoft's permission grant.
 
-   The protected mode fails closed if the Microsoft native persistence extension or OS vault is unavailable. On Windows it uses current-user DPAPI; on Linux it requires Secret Service/LibSecret with plaintext fallback disabled. The current WSL environment does not expose `org.freedesktop.secrets`, so protected mode is not presently usable there. No OAuth consent is needed to test the storage layer. See [protected storage contract](../lib/email/PROTECTED_STORAGE.md).
+## First controlled read (run yourself in WSL)
 
-6. Open the printed Microsoft URL in your browser. Sign in directly to Microsoft with the configured personal account and consent to read mail. Career Ops checks the returned account identity and granted scopes. The state-checked PKCE callback expires after five minutes. Keep the terminal running. Never share the callback URL, cache file, access/refresh tokens, or employer verification codes. Session-only mode will not retain tokens for a later CLI process.
-7. Independently verify an employer/ATS sender address from a genuine message or employer documentation. Add it for an existing application job key (found in `data/application-automation/ledger.json`):
+From the repository root, using Linux `node` (not `node.exe`):
 
-   ```bash
-   node scripts/outlook-email.mjs trust-sender --job-key EXISTING_JOB_KEY --sender VERIFIED_SENDER_EMAIL
-   node scripts/outlook-email.mjs preview
-   node scripts/outlook-email.mjs sync
-   ```
+```bash
+node scripts/outlook-email.mjs init --client-id YOUR_APPLICATION_CLIENT_ID --account YOUR_ADDRESS@msn.com
+CAREER_OPS_OUTLOOK_CREDENTIAL_MODE=session node scripts/outlook-email.mjs first-sync --hours 1
+```
 
-   No sender is preapproved or guessed, including Greenhouse/Affirm senders. Preview retrieves read-only messages and prints redacted classifications without writing observations. Sync records the same classifications as review-only ledger evidence. An empty sender configuration produces no matched observations. The trust-sender command adds a sender filter, not proof against spoofing.
+Skip `init` if private configuration already exists. If an older configuration
+lacks an opaque mailbox identity, explicitly migrate only that field first:
 
-8. Review observations before any future authorization of code entry or status changes. Until then, neither operation is supported. To clear the current in-memory/protected cache:
+```bash
+node scripts/outlook-email.mjs migrate-identity
+```
 
-   ```bash
-   node scripts/outlook-email.mjs disconnect
-   ```
+Open the authorization URL printed by `first-sync` in your browser on this same
+computer. Keep the terminal running. Select the intended personal account and
+review the read-mail/sign-in consent. Complete any MFA Microsoft requires. The
+loopback callback expires after five minutes. WSL's localhost forwarding must
+let the browser reach the callback. If it cannot, fix that local connectivity or
+use a native Windows working copy; never bind the callback to a public interface
+or paste an authorization code into chat.
 
-   Also remove the app's consent through your Microsoft account's app-permissions settings to revoke remote access.
+The configured account must match the username MSAL returns. If Microsoft uses
+a different primary alias, stop and review your account configuration/alias;
+there is no automatic alias switch or acceptance of an unrelated account.
 
-## Storage and read boundaries
+The command:
 
-The private configuration is `data/application-automation/outlook.json` under the resolved Career Ops data root. New configurations contain a random opaque mailbox ID and private sender rules. Account information and sender rules must never be committed. OAuth persistence is session-only by default. Persistent token storage uses the Microsoft Authentication Extensions library, current-user DPAPI on Windows, or LibSecret/Secret Service on Linux, with plaintext fallback explicitly disabled. `CAREER_OPS_OUTLOOK_AUTH_DIR` selects only the private lock/state directory and may not point inside Git or through a symlink. See [PROTECTED_STORAGE.md](../lib/email/PROTECTED_STORAGE.md) for platform limits and validation steps.
+- Reads one metadata page of at most **10 messages** from the last **one hour**.
+  All preview/sync CLI paths have a hard **24-hour** lookback ceiling, one page
+  and 10-message cap, regardless of larger settings in old configuration.
+- Fetches at most 10 details, only for configured exact sender/recipient/job-time
+  matches. No sender rules means metadata-only inspection and zero matches.
+- Uses only GET on the exact HTTPS Graph message collection/detail endpoints,
+  with redirects refused. There is no send, delete, move, update or mark-read
+  operation. No attachment, remote image, email link or instruction is executed.
+- Prints bounded counts/coverage flags. It records only review observations and
+  operational health, never raw subjects, bodies, tokens, cursor URLs or codes.
+  A confirmation may propose a status; it cannot change job status or submit.
 
-The prior implementation used a plaintext `msal-cache.json`; the revised code neither reads nor deletes that legacy file. If one already exists, the CLI warns and leaves it for user-reviewed revocation/removal. The private Outlook configuration can still contain the email address and client ID, but it is not a token cache and remains subject to the existing private-file rules.
+`incomplete: true` / exit 2 means the page cap or a failure prevented complete
+window coverage. It will not fetch another page or retry automatically. A complete
+result / exit 0 means only that explicitly bounded window, not all mail, was
+processed. Exit 1 indicates a CLI/authentication/configuration failure. Check
+recorded state after any uncertain publication instead of assuming rollback.
 
-The CLI holds the existing directory-lock protocol across OAuth operations, including refresh-token rotation. Protected cache writes are delegated to the OS store. No token/error-response bodies or verification codes are logged. The authentication URL contains public client/PKCE metadata and a login hint, not access tokens. Disconnect does not delete email or private audit history.
+To inspect without writing observation/health records, with a separate explicit
+sign-in in the same process:
 
-Graph calls are restricted to GET `/v1.0/me/messages` and individual message detail endpoints, HTTPS on the exact Graph origin, with redirects refused. No mail send/delete/archive/move/mark-read API exists in this adapter. No attachments, remote images, links or embedded instructions are opened. Message content is untrusted data. Metadata is fetched first; bodies are requested only for configured senders, exact recipients and application time windows. Default lookback is seven days (`--since ISO_TIMESTAMP` overrides it), with at most five pages of 50 messages (`maxPages` in private configuration can be 1–20). `hasMore: true` means the bounded scan is incomplete; no claim of full mailbox coverage is made. HTTP 401/429/network errors stop the operation without logging provider response content or automatically retrying.
+```bash
+CAREER_OPS_OUTLOOK_CREDENTIAL_MODE=session node scripts/outlook-email.mjs preview --interactive --hours 1
+```
 
-Immutable message identifiers are requested on every Graph call. Only account-scoped hashes of IDs, category, job key, timestamps, review flags and proposed status are persisted in `ledger.emailInbox`/`ledger.events`; message bodies, subjects, tokens and codes are not retained. Duplicate/concurrent runs append each observation once. Repeated preview runs deliberately do not persist processing state. Unmatched/excluded messages are not retained. Review observations can be removed through a future explicit retention/purge workflow; no purge scheduler is enabled.
+Only if you already have an application job and an independently verified sender:
 
-## Matching and limitations
+```bash
+node scripts/outlook-email.mjs trust-sender --job-key EXISTING_JOB_KEY --sender VERIFIED_SENDER_EMAIL
+```
 
-Matching requires an independently configured exact sender, consistent From/Sender, exact To/Cc recipient, a valid received timestamp after the application's recorded start (or discovery), and employer plus requisition/posting context. Shared senders and ambiguous requisitions fail closed. Forwarded/aliased/Bcc messages and subjects lacking context may be missed; missing data is never inferred. Email-only recruiter contacts without a ledger job are currently excluded. Templates and localization may require additional tested classifiers.
+This adds a filter, not proof of authenticity. No address is preapproved or
+guessed. All classifications retain `requiresReview: true`,
+`senderAuthentication: not-live-validated`, and `codeUseAllowed: false`.
+No generic or autonomous submission capability is imported by these commands.
 
-Verification detection additionally requires an explicit fresh `activeVerification` record with purpose `application_email_verification`, job key, expected sender, requestedAt and expiresAt, lasting at most 15 minutes. Only one uniquely matched numeric code is recognized in memory; output exposes only `hasUniqueCode`, never the code itself. No runtime path returns a usable code or enters it into a browser. Account login, password reset, recovery, MFA/enrollment and unrelated authentication messages are excluded. Negative matching is intentionally conservative.
+## Optional native Windows protected credentials
 
-**Sender authenticity is not live-validated.** An address allowlist alone does not prove sender identity. Microsoft authentication headers and actual employer templates still need inspection after connection; forwarded/spoofed headers must not become trusted self-assertions. All observations therefore carry `requiresReview: true`, `senderAuthentication: not-live-validated`, and `codeUseAllowed: false`. Even a convincing confirmation only proposes Submitted; it never changes the application state automatically. Interview/assessment/rejection updates are likewise review-only. This preserves the existing confirmation/approval boundary and prevents an email from authorizing a submission, resetting a verification retry block, or enabling autonomy.
+Use this only if you want credentials to survive process exit. Run native Node
+and PowerShell on the intended Windows account, in a Windows working copy with
+its own Windows-installed dependencies. Do not reuse WSL `node_modules` or call
+Windows DPAPI from WSL. Windows uses Microsoft's **CurrentUser DPAPI**, encrypted
+files, and explicit DACL checks; POSIX chmod bits do not prove Windows privacy.
+The validator accepts allow rules only for the current user and SYSTEM, requires
+current-user ownership, and fails closed if ACL inspection is unavailable.
 
-Before future code use: validate live sender authentication provenance and templates, preserve a live native verification session, verify exact session/time/recipient binding and code expiry, add explicit scoped authorization, then test native code entry and receipt recovery. Email integration alone does not repair the earlier browser-session timeout. Before automatic status transitions: approve a confirmation-evidence contract and use the canonical ledger/tracker transition paths. No submission functionality is imported or called by this CLI; submission policy, approval gates and emergency kill switch remain unchanged.
+In a native Windows checkout, install the existing declared dependencies:
 
-## Validation
+```powershell
+npm install --ignore-scripts
+npm rebuild keytar
+node scripts/outlook-readiness.mjs
+```
 
-Run `node --test tests/outlook-email.test.mjs` for synthetic OAuth loopback/PKCE/state, private storage, GET-only Graph pagination, exclusions, time/context/recipient checks, code redaction and ledger deduplication. These tests use a fake Microsoft client/Graph responses; they do not connect a mailbox or validate a live Microsoft consent screen. Complete connect/preview and inspect real matched templates before describing retrieval or sender authentication as live-validated.
+Rebuild downloads a compatible native binding or requires Microsoft's C++ build
+tools/Python if no compatible prebuild exists. Readiness may load the extension
+without proving its DPAPI component works. The synthetic restart test below is
+required before selecting protected mode. These Windows operations were not run
+in the current WSL session.
 
-References: [Microsoft OAuth code flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow), [Graph personal-account mail permissions](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0), [localhost redirect rules](https://learn.microsoft.com/en-us/entra/identity-platform/reply-url), [immutable Outlook IDs](https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
+Create a **new** private Windows state directory, with inheritance removed and
+current-user-only access. This setup refuses to replace an existing directory:
+
+```powershell
+$careerState = Join-Path $env:LOCALAPPDATA 'CareerOps-Outlook'
+if (Test-Path -LiteralPath $careerState) { throw 'Directory exists; review its ACLs rather than replacing it.' }
+New-Item -ItemType Directory -Path $careerState | Out-Null
+$careerSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$careerAcl = New-Object System.Security.AccessControl.DirectorySecurity
+$careerAcl.SetOwner($careerSid)
+$careerAcl.SetAccessRuleProtection($true, $false)
+$careerRule = New-Object System.Security.AccessControl.FileSystemAccessRule($careerSid, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+$careerAcl.AddAccessRule($careerRule)
+Set-Acl -LiteralPath $careerState -AclObject $careerAcl
+$env:CAREER_OPS_ROOT = Join-Path $careerState 'Data'
+$env:CAREER_OPS_OUTLOOK_AUTH_DIR = Join-Path $careerState 'Auth'
+New-Item -ItemType Directory -Path $env:CAREER_OPS_ROOT, $env:CAREER_OPS_OUTLOOK_AUTH_DIR | Out-Null
+$careerTestId = [guid]::NewGuid().ToString('N')
+node scripts/outlook-vault-test.mjs save --test-id $careerTestId
+```
+
+Note the test ID (it is synthetic, not a credential). Start a **new PowerShell
+process under the same Windows user**, enter the same checkout, restore paths,
+then verify decryption after the Node process restart and delete the test entry:
+
+```powershell
+$careerState = Join-Path $env:LOCALAPPDATA 'CareerOps-Outlook'
+$env:CAREER_OPS_ROOT = Join-Path $careerState 'Data'
+$env:CAREER_OPS_OUTLOOK_AUTH_DIR = Join-Path $careerState 'Auth'
+node scripts/outlook-vault-test.mjs verify --test-id THE_TEST_ID_FROM_SAVE
+```
+
+Both commands must print `result: passed`. Verification also rejects a plaintext
+synthetic value in the native cache file. No token/cache is opened by this test:
+it uses a separate service/account label and `vault-tests` subdirectory. If a test
+was interrupted, `delete --test-id THE_TEST_ID` removes only its synthetic entry.
+A pass does not certify cross-user isolation or interrupted-write durability;
+those native platform checks remain unrun. Test only with synthetic entries if
+you perform those additional checks. Persistent mode remains opt-in.
+
+After a successful storage test, initialize the Windows private configuration
+using your client ID/account, then:
+
+```powershell
+$env:CAREER_OPS_OUTLOOK_CREDENTIAL_MODE = 'protected'
+node scripts/outlook-email.mjs first-sync --hours 1
+```
+
+This Windows data root is separate from existing WSL application records; it
+will have no sender/job matches unless deliberately populated. Do not copy or
+merge trackers/ledgers casually. The current WSL session-only path uses your
+existing data root and avoids this platform/data migration for the first read.
+
+For WSL persistence instead, install the native build prerequisites
+(`build-essential`, `pkg-config`, `libsecret-1-dev`) and configure a real,
+password-protected, unlocked user Secret Service in your Linux session, then
+rebuild `keytar` and run the synthetic save/restart/verify test. D-Bus alone is
+insufficient. Never use an empty keyring password or plaintext fallback.
+
+## Recovery, legacy storage and disconnect
+
+Private config: `{DATA_ROOT}/data/application-automation/outlook.json`.
+User-layer files must stay out of Git. Existing `msal-cache.json` is detected by
+existence only, warned about, ignored and never migrated/deleted. Review its
+revocation/removal separately. Do not open it in agent output.
+
+The CLI holds its session lock over sign-in, refresh and bounded inspection.
+The existing ledger lock/CAS protects health and evidence. The owner writer
+cannot promote incomplete/failed windows to successful checkpoints. Interrupted
+syncs require explicit recovery after stopping the original worker:
+
+```bash
+node scripts/outlook-sync-recovery.mjs status
+node scripts/outlook-sync-recovery.mjs abandon --run-id RUN_ID --expected-revision REVISION --acknowledge-worker-stopped
+```
+
+Recovery never replays mail or changes application status. Failed runs with
+uncertain observation writes remain reviewable; do not assume an exactly-once
+transaction across observation and checkpoint commits.
+
+In the credential mode used for the connection:
+
+```bash
+node scripts/outlook-email.mjs disconnect
+```
+
+For protected credentials set the same protected-mode environment variable and
+private directory first. Disconnect uses MSAL's `getAllAccounts`/`removeAccount`
+API to remove cached account credentials; it does not delete mail or revoke
+Microsoft-side consent. Remove the app permission in your Microsoft account's
+app-permissions settings to revoke remote access. Session-only tokens disappear
+when their process exits, though the remote consent remains until revoked.
+
+## Regression validation
+
+```bash
+node --test tests/outlook-controlled-sync.test.mjs tests/outlook-email.test.mjs tests/outlook-bounded-sync.test.mjs tests/outlook-sync-recovery.test.mjs tests/outlook-readiness.test.mjs tests/career-central-platform-recovery.test.mjs tests/career-central-persistence.test.mjs
+```
+
+All mailbox/OAuth tests use fictional data and injected Microsoft responses;
+loopback OAuth tests contact only localhost. Native Windows ACL/DPAPI, a working
+Linux Secret Service, real Microsoft consent, Graph retrieval and sender
+provenance remain live acceptance steps, not claims established by mocks.

@@ -1,5 +1,7 @@
 # Staged application automation
 
+See also the per-provider capability register ([JOB_SOURCES](../career-central/design/JOB_SOURCES.md)) and the unified authorization model ([APPROVALS_AND_AUTONOMY](../career-central/design/APPROVALS_AND_AUTONOMY.md)), which existing approval checks will map onto without being weakened.
+
 ## Current implementation
 
 Keep the existing provider registry (`providers/_registry.mjs`), transport (`providers/_http.mjs`), scanner (`scan.mjs`), ATS liveness checks (`liveness-api.mjs`), and Playwright installation. No application submission endpoint or submit-click transport has been added. A separately authorized, exact-PDF storage-upload path is available for preparation tests.
