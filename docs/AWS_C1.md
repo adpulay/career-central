@@ -363,11 +363,11 @@ Target: account **978446946447**, region **us-east-1** (Identity Center lives in
 **0. Build the package (WSL, offline; already done for this review).**
 
 ```bash
-cd /home/adam/JobScraper/career-ops-c1/infra && npm run package:cloudshell
+cd <C1 worktree>/infra && npm run package:cloudshell
 sha256sum dist/cloudshell/career-central-c1/SHA256SUMS     # record this value
 ```
 
-The SHA256SUMS hash is the integrity anchor. The tarball's own hash changes on every rebuild (file timestamps), but its contents do not. Upload `\\wsl$\Ubuntu\home\adam\JobScraper\career-ops-c1\infra\dist\cloudshell\career-central-c1.tar.gz` with CloudShell → **Actions → Upload file**.
+The SHA256SUMS hash is the integrity anchor. The tarball's own hash changes on every rebuild (file timestamps), but its contents do not. Upload `infra/dist/cloudshell/career-central-c1.tar.gz` (from Windows: `\\wsl$\<distro>\<path to the C1 worktree>\infra\dist\cloudshell\`) with CloudShell → **Actions → Upload file**.
 
 **1. Identity, region and package (read-only).**
 
