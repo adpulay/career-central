@@ -60,6 +60,13 @@ test('bundled seed script: dry run from an empty directory touches nothing; --ap
     const dry = spawnSync(process.execPath, ['--import', path.join(here, 'helpers/side-effect-guard.mjs'), script, 'probe'], {cwd, encoding: 'utf8', env: {PATH: process.env.PATH, HOME: cwd}, timeout: 60000});
     assert.equal(dry.status, 0, dry.stderr);
     assert.equal(JSON.parse(dry.stdout.trim().split('\n').at(-1)).dryRun, true);
+    const auth = spawnSync(process.execPath, ['--import', path.join(here, 'helpers/side-effect-guard.mjs'), script, 'authorize', '--source', 'alpha', '--hours', '2'], {cwd, encoding: 'utf8', env: {PATH: process.env.PATH, HOME: cwd}, timeout: 60000});
+    assert.equal(auth.status, 0, auth.stderr);
+    const plan = JSON.parse(auth.stdout.trim().split('\n').at(-1));
+    assert.deepEqual([plan.dryRun, plan.command, plan.writes.length], [true, 'authorize', 1]);
+    assert.match(plan.writes[0], /MONITOR\/INDEX .*no partition or control writes/);
+    const missing = spawnSync(process.execPath, [script, 'authorize', '--source', 'alpha'], {cwd, encoding: 'utf8', env: {PATH: process.env.PATH, HOME: cwd}, timeout: 60000});
+    assert.equal(missing.status, 1); assert.match(missing.stderr, /SEED_AUTHORIZE_ARGS_REQUIRED/);
     const bad = spawnSync(process.execPath, [script, 'seed', '--apply', '--bucket', 'some-prod-bucket', '--table', 'prod-table', '--region', DEV_REGION], {cwd, encoding: 'utf8', env: {PATH: process.env.PATH, HOME: cwd}, timeout: 60000});
     assert.equal(bad.status, 1); assert.match(bad.stderr, /SEED_TARGET_NOT_DEV/);
     assert.deepEqual(fs.readdirSync(cwd), []);

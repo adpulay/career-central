@@ -9,6 +9,10 @@
 //   node scripts/seed-dev-fixture.mjs seed    [--hours 2]    # source + authorization + projection + fixture step 1
 //   node scripts/seed-dev-fixture.mjs fixture --step 2       # one new posting
 //   node scripts/seed-dev-fixture.mjs revoke                 # remove the authorization
+//   node scripts/seed-dev-fixture.mjs authorize --source alpha --hours 2
+//                                                            # renew the authorization of an already seeded
+//                                                            # synthetic source; never configures, resets or
+//                                                            # rewrites its baseline, snapshots or alerts
 //   node scripts/seed-dev-fixture.mjs status                 # read-only counts and states
 //   node scripts/seed-dev-fixture.mjs probe                  # real S3/DynamoDB conditional semantics
 //
@@ -44,8 +48,27 @@ export function fixtureSnapshot(step) {
 }
 export const syntheticProjection = (now = Date.now()) => JSON.stringify(buildEligibilityProjection(syntheticContext(), {}, {now}));
 
-export async function runSeed({command, step = 1, hours = 2, now = Date.now(), store, assets}) {
+export const FIXTURE_SOURCE_IDS = Object.freeze([FIXTURE_SOURCE.id]);
+
+export async function runSeed(options) {
+  const {command, step = 1, now = Date.now(), store, assets, source} = options;
+  // authorize has no defaults: the source and the duration must both be stated.
+  if (command === 'authorize' && (options.hours === undefined || source === undefined)) throw fail('SEED_AUTHORIZE_ARGS_REQUIRED');
+  const hours = options.hours ?? 2;
   if (!Number.isInteger(hours) || hours < 1 || hours > MAX_TEST_HOURS) throw fail('SEED_HOURS_INVALID');
+  if (command === 'authorize') {
+    if (!FIXTURE_SOURCE_IDS.includes(source)) throw fail('SEED_SOURCE_NOT_FIXTURE');
+    // Renewal only: the source must already be seeded; nothing is configured or reset.
+    const before = await store.load();
+    if (!before.sources[source]) throw fail('MONITOR_SOURCE_UNKNOWN');
+    const previous = before.scheduler?.authorization ?? null;
+    // authorizeRecurring changes only scheduler.authorization; the store then rewrites only the
+    // MONITOR/INDEX item (sources whose partition and control are unchanged are not written).
+    const auth = await authorizeRecurring(store, {sourceIds: [source], hours, maxPollsPerTick: 1, now});
+    return {authorized: true, sourceIds: auth.sourceIds, expiresAt: auth.expiresAt, maxPollsPerTick: auth.maxPollsPerTick,
+      previous: previous ? {expiresAt: previous.expiresAt} : {revokedAt: before.scheduler?.revokedAt ?? null},
+      preserved: {alertCount: Object.keys(before.alerts ?? {}).length, provenance: before.sources[source].checkpoint?.provenance ?? null}};
+  }
   if (command === 'seed') {
     await configureSources(store, [FIXTURE_SOURCE]);
     await authorizeRecurring(store, {sourceIds: [FIXTURE_SOURCE.id], hours, maxPollsPerTick: 1, now});
@@ -93,11 +116,15 @@ export function parseArgs(argv) {
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i];
     if (flag === '--apply') options.apply = true;
-    else if (['--bucket', '--table', '--region', '--hours', '--step'].includes(flag) && rest[i + 1] !== undefined) options[flag.slice(2)] = rest[++i];
+    else if (['--bucket', '--table', '--region', '--hours', '--step', '--source'].includes(flag) && rest[i + 1] !== undefined) options[flag.slice(2)] = rest[++i];
     else throw fail('SEED_ARGS_INVALID');
   }
+  if (!['seed', 'fixture', 'revoke', 'status', 'probe', 'authorize'].includes(command)) throw fail('SEED_COMMAND_INVALID');
+  if (command === 'authorize') {
+    if (options.hours === undefined || options.source === undefined) throw fail('SEED_AUTHORIZE_ARGS_REQUIRED');
+    if (!FIXTURE_SOURCE_IDS.includes(options.source)) throw fail('SEED_SOURCE_NOT_FIXTURE');
+  } else if (options.source !== undefined) throw fail('SEED_ARGS_INVALID');
   options.hours = Number(options.hours ?? 2); options.step = Number(options.step ?? 1);
-  if (!['seed', 'fixture', 'revoke', 'status', 'probe'].includes(command)) throw fail('SEED_COMMAND_INVALID');
   if (options.apply) {
     if (!options.bucket || !options.table || !options.region) throw fail('SEED_TARGET_REQUIRED');
     if (![options.bucket, options.table].every(name => /monitor-dev/i.test(name))) throw fail('SEED_TARGET_NOT_DEV');
@@ -113,7 +140,8 @@ async function main() {
     if (!Number.isInteger(options.hours) || options.hours < 1 || options.hours > MAX_TEST_HOURS) throw fail('SEED_HOURS_INVALID');
     const writes = {seed: ['dynamodb MONITOR/INDEX (source alpha, authorization)', `dynamodb SOURCE#alpha/CONTROL`, `s3 ${PROJECTION_KEY} (synthetic)`, `s3 ${FIXTURE_KEY} (step 1)`],
       fixture: [`s3 ${FIXTURE_KEY} (step ${options.step})`], revoke: ['dynamodb MONITOR/INDEX (authorization removed)'],
-      status: ['none (read-only)'], probe: ['s3 probe/{uuid}.json (conditional puts)', 'dynamodb PROBE#{uuid} (created, conditionally updated, deleted)']}[options.command];
+      status: ['none (read-only)'], probe: ['s3 probe/{uuid}.json (conditional puts)', 'dynamodb PROBE#{uuid} (created, conditionally updated, deleted)'],
+      authorize: [`dynamodb MONITOR/INDEX (authorization for ${options.source}, ${options.hours} h, 1 poll per tick; no partition or control writes)`]}[options.command];
     console.log(JSON.stringify({dryRun: true, command: options.command, writes, note: 'nothing contacted; add --apply --bucket --table --region to write'}));
     return;
   }

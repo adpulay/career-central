@@ -496,6 +496,9 @@ aws iam simulate-principal-policy --policy-source-arn $TICK_ARN --action-names s
 aws iam simulate-principal-policy --policy-source-arn $TICK_ARN --action-names dynamodb:DeleteItem --resource-arns arn:aws:dynamodb:us-east-1:$ACCOUNT:table/$T --context-entries "ContextKeyName=dynamodb:LeadingKeys,ContextKeyValues=SOURCE#alpha,ContextKeyType=stringList" --query 'EvaluationResults[].EvalDecision' --output text   # implicitDeny
 aws iam simulate-principal-policy --policy-source-arn $TICK_ARN --action-names dynamodb:DeleteItem --resource-arns arn:aws:dynamodb:us-east-1:$ACCOUNT:table/$T --context-entries "ContextKeyName=dynamodb:LeadingKeys,ContextKeyValues=MONITOR,ContextKeyType=stringList" --query 'EvaluationResults[].EvalDecision' --output text   # allowed
 $SEED revoke $TARGET && sleep 370 && invoke ~/cc/out4.json && $SEED status $TARGET             # 14: ok false, MONITOR_RECURRING_NOT_AUTHORIZED; nothing polled
+# Renew for further tests (APPROVAL REQUIRED): changes only the MONITOR/INDEX authorization; alerts, checkpoint, source record and S3 snapshots stay as they are
+$SEED authorize --source alpha --hours 2                     # dry run first: prints the single planned write, contacts nothing
+$SEED authorize --source alpha --hours 2 $TARGET && $SEED status $TARGET                          # authorizationExpiresAt set; alertCount and provenance unchanged
 # 15-16: logs and alarms
 for p in '"example.invalid"' '"Fictional Alpha"'; do aws logs filter-log-events --log-group-name "$LG" --filter-pattern "$p" --query 'length(events)' --output text; done   # 0 and 0
 aws cloudwatch describe-alarms --alarm-name-prefix CareerCentralMonitor-dev --query "MetricAlarms[?StateValue=='ALARM'].AlarmName" --output text   # empty
@@ -590,9 +593,15 @@ The budget and SCPs remain as account guardrails; removing them is a separate de
     - Disabling the schedule stops all activity. The schedule has been disabled throughout, so the enable → disable transition is untested.
     - The restore drill: one partition from an S3 version plus the control item from PITR.
   - **Execution-role simulator set:** confirm whether CloudShell step 5's execution-role checks were among the five decisions above. If not, they remain to run.
-- **Tooling gap for further cloud tests.** After the revoke, the dev table holds no authorization. `seed-dev-fixture.mjs seed` cannot restore it, because it configures the source first and fails with `MONITOR_SOURCE_EXISTS` for the existing `alpha`. The options are a fresh stack, or an `authorize` subcommand, which is a code change needing its own review. No re-authorization has been performed.
+- **Re-authorization after the revoke (implemented and tested locally; not yet run in AWS).** After the revoke, the dev table holds no authorization. `seed` cannot restore it: it configures the source first, and that fails with `MONITOR_SOURCE_EXISTS` for the existing `alpha`. The new command renews it instead:
+  - **Form:** `seed-dev-fixture.mjs authorize --source alpha --hours N`. `--source` and `--hours` are required, with no defaults. Only the synthetic fixture source is accepted, and `N` is a whole number from 1 to 24. `--apply`, plus an explicit `monitor-dev` bucket, table and region, is required to write; without it the command is a dry run that contacts nothing.
+  - **Renewal only.** An unseeded source is refused (`MONITOR_SOURCE_UNKNOWN`) and never created. The authorization names exactly the given source, with 1 poll per tick.
+  - **Preservation**, proven locally against the AWS emulator: only the `MONITOR/INDEX` item changes, in one conditional write with no S3 write. Every S3 object (partition snapshot, projection, fixtures) and the `SOURCE#alpha` control item (version included) are byte-identical afterwards. Alerts, postings and the checkpoint are unchanged, and the next tick adds no alert.
+  - **Scope.** It cannot touch the schedule or live reads: the script has no Lambda, Scheduler or CloudFormation client.
+  - **Permissions.** Running it in AWS needs no new IAM permissions: it reads the store and writes one table item. Running it is an approval of its own.
+  - No re-authorization has been performed in AWS.
 - **Operational approvals still required (each separate; none given):**
-  - How to continue cloud testing after the revoke: a fresh stack, or a reviewed `authorize` subcommand.
+  - Continuing cloud testing after the revoke by running `authorize` (above) in the dev account, or using a fresh stack.
   - An alarm notification channel (alarms have no actions today).
   - Enabling the EventBridge schedule.
   - Enabling live employer reads.

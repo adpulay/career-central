@@ -22,7 +22,9 @@
   - The missing-object 404 check and the conditional-semantics probe.
   - A simultaneous claim race.
   - **Failure/recovery:** timeout → `worker_lost`, stale-writer 412, backoff, authorization expiry, the schedule-disable transition, the restore drill.
-- **Further cloud tests are blocked on re-authorization.** The seed script cannot re-authorize the existing source; this needs a fresh stack or a reviewed `authorize` subcommand.
+- **Re-authorization:**
+  - A new `seed-dev-fixture.mjs authorize --source alpha --hours N` renews the existing synthetic source's authorization. Only the `MONITOR/INDEX` item changes; snapshots, the source record, alerts and the checkpoint are preserved (tested locally).
+  - It is not yet run in AWS; running it needs approval.
 
   See [AWS_C1 → Deployment record](../AWS_C1.md#deployment-record) and [CC-017 → Dev acceptance record](tasks/CC-017.md#dev-acceptance-record--account-978446946447--us-east-1-results-verified-by-the-user-on-2026-11-12).
 
