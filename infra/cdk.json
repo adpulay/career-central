@@ -1,0 +1,6 @@
+{
+  "app": "node scripts/bundle.mjs >/dev/null && node bin/app.mjs",
+  "context": {
+    "@aws-cdk/core:newStyleStackSynthesis": true
+  }
+}
