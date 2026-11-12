@@ -536,3 +536,39 @@ test('paged read model reaches every reviewable posting exactly once; alerts car
   const alert = monitorView(root, {now}).alerts[0];
   assert.equal(alert.title, job().title); assert.equal(alert.company, source.company);
 }));
+
+test('post-resume failure diagnostics: DNS, network, reset, connect timeout, TLS, request timeout, HTTP, rate limit, validation', async () => {
+  const fetchFailed = code => new TypeError('fetch failed', {cause: Object.assign(Error(`${code} detail`), {code})});
+  const cases = [
+    [fetchFailed('ENOTFOUND'), 'dns_failure'], [fetchFailed('EAI_AGAIN'), 'dns_failure'],
+    [fetchFailed('ENETUNREACH'), 'network_unavailable'], [fetchFailed('ECONNREFUSED'), 'network_unavailable'],
+    [fetchFailed('ECONNRESET'), 'connection_reset'], [fetchFailed('UND_ERR_SOCKET'), 'connection_reset'],
+    [fetchFailed('UND_ERR_CONNECT_TIMEOUT'), 'connection_timeout'], [fetchFailed('CERT_HAS_EXPIRED'), 'tls_failure'],
+    [Object.assign(Error('This operation was aborted'), {name: 'AbortError'}), 'timeout'],
+    [Object.assign(Error('MONITOR_FEED_REQUEST_FAILED'), {code: 'MONITOR_FEED_REQUEST_FAILED', status: 503}), 'http_503'],
+    [Object.assign(Error('x'), {status: 429}), 'rate_limit'],
+    [Object.assign(Error('MONITOR_FEED_SHAPE_INVALID'), {code: 'MONITOR_FEED_SHAPE_INVALID'}), 'MONITOR_FEED_SHAPE_INVALID'],
+    [Object.assign(fetchFailed('ENOTFOUND'), {monitorPhase: 'enrichment'}), 'enrichment_dns_failure'],
+    [new Error('unrecognized'), 'provider_unavailable'],
+  ];
+  for (const [error, expected] of cases) assert.equal(failureCategory(error), expected, expected);
+  // A real undici error shape, produced locally without any external request:
+  // connect to a loopback port that was just closed (port 1 would be rejected by
+  // fetch's blocked-port list before any connection).
+  const {createServer} = await import('node:net');
+  const server = createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const {port} = server.address(); await new Promise(resolve => server.close(resolve));
+  const refused = await fetch(`http://127.0.0.1:${port}/`).catch(error => error);
+  assert.equal(failureCategory(refused), 'network_unavailable');
+});
+
+test('post-resume network failure keeps exponential backoff and records the precise category', () => fixture(async root => {
+  await configureSources(root, [source]); await poll(root, [job()], now);
+  const fetchFailed = new TypeError('fetch failed', {cause: Object.assign(Error('getaddrinfo EAI_AGAIN'), {code: 'EAI_AGAIN'})});
+  const first = await poll(root, [], now + step * 2, {fetchSnapshot: async () => {throw fetchFailed;}});
+  assert.equal(first.errorCategory, 'dns_failure'); assert.equal(first.checkpointAdvanced, false);
+  const stored = readMonitor(root).sources.fictional;
+  assert.equal(stored.errorCategory, 'dns_failure'); assert.equal(stored.failures, 1);
+  assert.ok(Date.parse(stored.nextDueAt) - (now + step * 2) >= 2 * source.intervalMinutes * 60000, 'exponential backoff applied');
+  assert.equal(Object.keys(readMonitor(root).alerts).length, 0);
+}));
